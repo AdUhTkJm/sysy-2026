@@ -4,7 +4,7 @@
 #include <cmath>
 #include <map>
 
-using namespace sys;
+using namespace ast;
 
 std::map<std::string, Token::Type> keywords = {
   { "if", Token::If },

@@ -3,8 +3,6 @@
 
 #include <string>
 
-namespace sys {
-
 struct Options {
   using option = unsigned char;
 
@@ -33,7 +31,5 @@ struct Options {
 };
 
 Options parseArgs(int argc, char **argv);
-
-}
 
 #endif

@@ -6,7 +6,7 @@
 #include <ostream>
 #include <vector>
 
-using namespace sys;
+using namespace ast;
 
 int ConstValue::size() {
   int total = 1;

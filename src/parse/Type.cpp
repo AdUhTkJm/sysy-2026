@@ -2,7 +2,7 @@
 
 #include "Type.h"
 
-using namespace sys;
+using namespace ast;
 
 std::string interleave(const std::vector<Type*> &types) {
   std::stringstream ss;

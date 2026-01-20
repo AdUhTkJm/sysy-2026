@@ -5,7 +5,7 @@
 #include <string>
 #include <cstring>
 
-namespace sys {
+namespace ast {
 
 struct Token {
   enum Type {

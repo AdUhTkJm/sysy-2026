@@ -7,7 +7,7 @@
 
 #include "Type.h"
 
-namespace sys {
+namespace ast {
 
 class ASTNode;
 using ASTWalker = std::function<void (ASTNode *)>;

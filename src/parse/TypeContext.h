@@ -6,7 +6,7 @@
 #include "Type.h"
 #include "../utils/DynamicCast.h"
 
-namespace sys {
+namespace ast {
 
 // Manages memory of types.
 class TypeContext {
@@ -45,7 +45,7 @@ class TypeContext {
         if (arr->dims.size() != arrb->dims.size())
           return false;
 
-        for (int i = 0; i < arr->dims.size(); i++) {
+        for (unsigned i = 0; i < arr->dims.size(); i++) {
           if (arr->dims[i] != arrb->dims[i])
             return false;
         }
@@ -63,7 +63,7 @@ class TypeContext {
         if (fn->params.size() != fnb->params.size())
           return false;
 
-        for (int i = 0; i < fn->params.size(); i++) {
+        for (unsigned i = 0; i < fn->params.size(); i++) {
           if (!Eq()(fn->params[i], fnb->params[i]))
             return false;
         }

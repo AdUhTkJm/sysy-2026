@@ -3,7 +3,7 @@
 
 #include <string>
 #include <vector>
-namespace sys {
+namespace ast {
 
 class Type {
   const int id;

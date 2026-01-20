@@ -7,7 +7,7 @@
 #include <map>
 #include <string>
 
-namespace sys {
+namespace ast {
 
 // We don't need to do type inference, hence no memory management needed
 class Sema {

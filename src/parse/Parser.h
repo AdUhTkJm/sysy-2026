@@ -10,7 +10,7 @@
 #include "Lexer.h"
 #include "TypeContext.h"
 
-namespace sys {
+namespace ast {
 
 // A compile-time integer constant, used when early-folding array dimensions.
 // Only integer is allowed, as the language specifies.

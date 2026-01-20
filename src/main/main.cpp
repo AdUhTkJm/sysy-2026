@@ -3,14 +3,18 @@
 #include "../parse/Parser.h"
 #include "../parse/Sema.h"
 
+#include "../ir/Ops.h"
+
 #include <fstream>
 #include <sstream>
 #include <iostream>
 
-sys::Options opts;
+Options opts;
 
 int main(int argc, char **argv) {
-  opts = sys::parseArgs(argc, argv);
+  std::cout << ir::ModuleOp::mnemonic << "\n";
+
+  opts = parseArgs(argc, argv);
 
   // Read input file.
   std::ifstream ifs(opts.inputFile);
@@ -24,11 +28,12 @@ int main(int argc, char **argv) {
   // Single-line comments cannot terminate with EOF.
   ss << ifs.rdbuf() << "\n";
 
-  sys::TypeContext ctx;
+  ast::TypeContext ctx;
 
-  sys::Parser parser(ss.str(), ctx);
-  sys::ASTNode *node = parser.parse();
-  sys::Sema sema(node, ctx);
+  ast::Parser parser(ss.str(), ctx);
+  ast::ASTNode *node = parser.parse();
+  ast::Sema sema(node, ctx);
 
+  
   return 0;
 }

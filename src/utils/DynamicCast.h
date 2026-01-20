@@ -3,8 +3,6 @@
 
 #include <cassert>
 
-namespace sys {
-
 template<class T, class U>
 bool isa(U *t) {
   return T::classof(t);
@@ -21,8 +19,6 @@ T *dyn_cast(U *t) {
   if (!isa<T>(t))
     return nullptr;
   return cast<T>(t);
-}
-
 }
 
 #endif

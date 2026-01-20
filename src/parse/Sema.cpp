@@ -8,7 +8,7 @@
 #include <vector>
 #include <set>
 
-using namespace sys;
+using namespace ast;
 
 PointerType *Sema::decay(ArrayType *arrTy) {
   std::vector<int> dims;

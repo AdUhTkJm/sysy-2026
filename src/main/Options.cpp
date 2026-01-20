@@ -2,8 +2,6 @@
 #include <cstring>
 #include <iostream>
 
-using namespace sys;
-
 #define PARSEOPT(str, field) \
   if (strcmp(argv[i], str) == 0) { \
     opts.field = true; \
@@ -24,7 +22,7 @@ Options::Options() {
   bv = false;
 }
 
-Options sys::parseArgs(int argc, char **argv) {
+Options parseArgs(int argc, char **argv) {
   Options opts;
 
   for (int i = 1; i < argc; i++) {
