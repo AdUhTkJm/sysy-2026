@@ -1,8 +1,7 @@
 #ifndef META_H
 #define META_H
 
-#include <string_view>
-#include <array>
+#include <string>
 #include <iostream>
 
 namespace meta {
@@ -19,6 +18,9 @@ struct const_str {
     for (int i = 0; i <= N; i++)
       data[i] = other.data[i];
   }
+
+  operator const char *() { return data; }
+  operator std::string() { return data; }
 };
 
 template<class T>
@@ -41,5 +43,11 @@ std::ostream &operator<<(std::ostream &os, const const_str<N> &str) {
 }
 
 }
+
+#if __cplusplus >= 202002L
+# define __requires(x) requires(x)
+#else
+# define __requires(x)
+#endif
 
 #endif

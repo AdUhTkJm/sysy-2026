@@ -27,14 +27,10 @@ public:
   AttrImpl(): Attr((unsigned long) unique()) {}
 };
 
-class TargetAttr : public AttrImpl<TargetAttr> {
+class IntAttr : public AttrImpl<IntAttr> {
 public:
-  Block *bb;
-};
-
-class ElseAttr : public AttrImpl<ElseAttr> {
-public:
-  Block *bb;
+  int i;
+  IntAttr(int i): i(i) {}
 };
 
 }

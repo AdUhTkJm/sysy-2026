@@ -1,5 +1,5 @@
 #include "OpBase.h"
-#include "Attr.h"
+#include "Attrs.h"
 #include "Ops.h"
 
 #include <deque>
@@ -9,6 +9,16 @@
 #include <algorithm>
 
 using namespace ir;
+
+Arena Op::arena;
+Arena Type::arena;
+Arena Value::arena;
+
+Type *ir::i32 = new Type(Type::i32);
+Type *ir::i64 = new Type(Type::i64);
+Type *ir::f32 = new Type(Type::f32);
+Type *ir::vi4 = new Type(Type::vi4);
+Type *ir::vf4 = new Type(Type::vf4);
 
 void Block::insert(iterator at, Op *op) {
   op->parent = this;
@@ -34,6 +44,13 @@ Block *Block::nextBlock() const {
   return *++it;
 }
 
+Op::~Op() {
+  for (auto x : results) {
+    assert(x->uses.empty());
+    delete x;
+  }
+}
+
 Op *Op::prevOp() const {
   auto it = place;
   if (it == parent->begin())
@@ -48,6 +65,16 @@ Op *Op::nextOp() const {
   return *it;
 }
 
+Value *Op::pushResult(const Type *t) {
+  auto value = new Value(t, this, results.size());
+  results.push_back(value);
+  return value;
+}
+
+void Op::removeResult(int i) {
+  results.erase(results.begin() + i);
+}
+
 void indent(std::ostream &os, int n) {
   for (int j = 0; j < n; j++)
     os << ' ';
@@ -56,6 +83,7 @@ void indent(std::ostream &os, int n) {
 Region *Op::appendRegion() {
   auto region = new Region(this);
   regions.push_back(region);
+  region->appendBlock();
   return region;
 }
 
@@ -152,7 +180,7 @@ void Op::removeOperand(Value *v) {
 }
 
 int Op::replaceOperand(Value *before, Value *v) {
-  for (int i = 0; i < operands.size(); i++) {
+  for (unsigned i = 0; i < operands.size(); i++) {
     auto value = operands[i];
     if (value == before) {
       setOperand(i, v);
@@ -168,11 +196,12 @@ void Op::erase() {
 
   for (auto region : regions)
     region->erase();
+  delete this;
 }
 
 Block *Op::createFirstBlock() {
   appendRegion();
-  return regions[0]->appendBlock();
+  return regions[0]->getFirstBlock();
 }
 
 void Value::replaceAllUsesWith(Value *other) {
@@ -358,11 +387,11 @@ void Region::updatePreds() const {
   for (auto bb : bbs) {
     assert(bb->getOpCount() > 0);
     auto last = bb->getLastOp();
-    if (auto attr = last->get<TargetAttr>())
-      attr->bb->preds.insert(bb);
+    if (auto target = targetOf(last))
+      target->preds.insert(bb);
     
-    if (auto attr = last->get<ElseAttr>())
-      attr->bb->preds.insert(bb);
+    if (auto other = elseOf(last))
+      other->preds.insert(bb);
   }
 
   for (auto bb : bbs) {
@@ -521,7 +550,7 @@ void Region::updateDoms() const {
   }
 
   // Find idom, but ignore the entry block (which has no idom).
-  for (int i = 1; i < vertex.size(); ++i) {
+  for (unsigned i = 1; i < vertex.size(); ++i) {
     auto bb = vertex[i];
     assert(bb->idom);
     if (bb->idom != sdom[bb])
@@ -712,15 +741,16 @@ void Region::updateLiveness() const {
   } while (changed);
 }
 
-int Printer::getBlockID(Block *block) {
-  auto it = blockid.find(block);
-  return it == blockid.end() ? blockid[block] = bid++ : it->second;
+Block *ir::targetOf(Op *op) {
+  if (auto br = dyn_cast<BranchOp>(op))
+    return br->target;
+  if (auto j = dyn_cast<JumpOp>(op))
+    return j->target;
+  return nullptr;
 }
 
-int Printer::getValueID(Value *value) {
-  auto it = valueid.find(value);
-  return it == valueid.end() ? valueid[value] = vid++ : it->second;
-}
-
-void Printer::print(Op *op) {
+Block *ir::elseOf(Op *op) {
+  if (auto br = dyn_cast<BranchOp>(op))
+    return br->target;
+  return nullptr;
 }

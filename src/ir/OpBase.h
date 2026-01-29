@@ -4,13 +4,12 @@
 #include <set>
 #include <vector>
 #include <map>
-#include <unordered_map>
 #include <string>
 #include <list>
-#include <iostream>
 
 #include "../utils/DynamicCast.h"
 #include "../utils/Meta.h"
+#include "../utils/Alloc.h"
 
 namespace ir {
 
@@ -21,30 +20,52 @@ class Region;
 
 using OpList = std::list<Op*>;
 using BlockList = std::list<Block*>;
-using AttrMap = std::map<std::string, Attr*>;
+using AttrMap = std::map<std::string, const Attr*>;
 
 struct Type {
+  static Arena arena;
+  static void* operator new(size_t size) { return arena.allocate(size, alignof(Type)); }
+  static void operator delete(void*) noexcept {}
+  static void *operator new[](size_t) = delete;
+  static void operator delete[](void*) noexcept = delete;
+
   enum Kind {
     i32, i64, f32, vi4, vf4, ptr, fn
   } kind;
   std::vector<Type*> subtypes;
 
-  Type *pointee() const;
-  Type *retType() const;
-  std::vector<Type*> argTypes() const;
+  Type() {}
+  Type(Kind kind): kind(kind) { assert(kind != ptr && kind != fn); }
+  Type(Kind kind, const std::vector<Type*> &subtypes): kind(kind), subtypes(subtypes) {}
+  Type *pointee() const { assert(subtypes.size() >= 1); return subtypes.front(); }
+  Type *retType() const { assert(subtypes.size() >= 1); return subtypes.front(); }
+  auto argTypes() const { assert(subtypes.size() >= 1); return std::vector(subtypes.begin() + 1, subtypes.end()); }
 };
+
+extern Type *i32, *i64, *f32, *vi4, *vf4;
 
 class Value {
   std::multiset<Op*> uses;
   
   friend class Op;
+  template<class T>
+  friend class OpImpl;
 public:
-  Type *type;
-  Op *def;
-  int index;
+  const Type *const type;
+  Op *const def;
+  const int index;
+
+  Value(const Type *type, Op *def, int index): type(type), def(def), index(index) {}
+
   void replaceAllUsesWith(Value *other);
 
   bool operator==(Value &other) const;
+
+  static Arena arena;
+  static void* operator new(size_t size) {
+    return arena.allocate(size, alignof(Value));
+  }
+  static void operator delete(void*) noexcept {}
 };
 
 class Op {
@@ -59,17 +80,28 @@ protected:
   friend class Value;
   friend class Block;
   friend class Region;
+  friend class Builder;
 public:
+  static Arena arena;
+  static void* operator new(size_t size) { return arena.allocate(size, alignof(Op)); }
+  static void operator delete(void*) noexcept {}
+  static void* operator new[](size_t) = delete;
+  static void operator delete[](void*) = delete;
+
   const unsigned long id;
   Op(Block *parent, OpList::iterator place, unsigned long id): parent(parent), place(place), id(id) {}
+  virtual ~Op();
 
   Op *nextOp() const;
   Op *prevOp() const;
   Op *getParentOp() const;
 
-  Value *getResult(int i = 0) { return results[i]; }
-  const auto &getResults() { return results; }
+  Value *getResult(int i = 0) const { return results[i]; }
+  const auto &getResults() const { return results; }
+  size_t getNumResults() const { return results.size(); }
+  size_t getNumOperands() const { return operands.size(); }
 
+  // Implicitly append a block to the region.
   Region *appendRegion();
   void removeRegion(Region *region);
 
@@ -81,6 +113,9 @@ public:
   void removeOperand(Value *v);
   int  replaceOperand(Value *before, Value *after);
   void clearOperands();
+
+  Value *pushResult(const Type *t);
+  void removeResult(int i);
 
   bool inside(Op *op) const;
 
@@ -101,23 +136,21 @@ public:
   const auto &getOperands() const { return operands; }
   const auto &getAttrs() const { return attrs; }
 
+  Value *val(unsigned i) const { assert(i < operands.size()); return operands[i]; }
+  Value *ret(unsigned i = 0) const { assert(i < results.size()); return results[i]; }
+
   template<class T>
-  T *get() {
+  const T *get() {
     std::string name(T::getMnemonics());
     auto it = attrs.find(name);
     return it == attrs.end() ? nullptr : cast<T>(it->second);
   }
 
   template<class T>
-  void set(Attr *attr) {
+  void set(const Attr *attr) {
     std::string name(T::getMnemonics());
     attrs[name] = attr;
   }
-
-  // Panicks if verification fails.
-  // No need to call verify() on sub-operations inside this function;
-  // That is handled separately.
-  virtual void verify() {}
 };
 
 template<class T>
@@ -128,16 +161,44 @@ class OpImpl : public Op {
   }
 public:
   static constexpr auto mnemonic = meta::name<T>();
-  static const char *getMnemonics() { return mnemonic.data(); }
-  static bool classof(const Op *op) { return op->id == (unsigned long) unique(); }
+  static const char *getMnemonics() { return mnemonic.data; }
+  static size_t identifier() { return (size_t) unique(); }
+  static bool classof(const Op *op) { return op->id == identifier(); }
 
-  OpImpl(Block *parent, OpList::iterator place): Op(parent, place, (unsigned long) unique()) {}
+  OpImpl(Block *parent, OpList::iterator place): Op(parent, place, identifier()) {}
+  
+  template<class ...Values> __requires((std::derived_from<std::remove_pointer_t<Values>, Value> && ...))
+  T *with(Values ...values) {
+    ((operands.push_back(values), values->uses.insert(this)), ...);
+    return (T*) this;
+  }
+
+  T *with(const std::vector<Value*> &values) {
+    for (auto x : values) {
+      operands.push_back(x);
+      x->uses.insert(this);
+    }
+    return (T*) this;
+  }
+
+  T *with(const AttrMap &map) {
+    attrs = map;
+    return (T*) this;
+  }
+
+  template<class Attr, class ...Args> __requires((requires(Args ...args) { Attr(args...); }))
+  T *with(Args ...args) {
+    attrs[T::getMnemonics()] = new Attr(args...);
+    return (T*) this;
+  }
 };
 
 class Block {
   OpList ops;
   Region *parent;
   BlockList::iterator place;
+  AttrMap attrs;
+  std::vector<Value*> args;
 
   std::set<Block*> doms, domFront, pdoms;
   std::set<Value*> liveIn, liveOut;
@@ -212,6 +273,7 @@ public:
   Op *getParentOp() const { return parent; }
   auto &getBlocks() { return bbs; }
   const auto &getBlocks() const { return bbs; }
+  size_t getNumBlocks() const { return bbs.size(); }
   Block *appendBlock();
   void erase();
 
@@ -223,23 +285,14 @@ public:
 
   iterator begin() { return bbs.begin(); }
   iterator end() { return bbs.end(); }
+  Block *front() const { assert(bbs.size() >= 1 && "region: front"); return bbs.front(); }
+  Block *back() const { assert(bbs.size() >= 1 && "region: back"); return bbs.back(); }
 };
 
-class Printer {
-  std::unordered_map<Block *, int> blockid;
-  std::unordered_map<Value *, int> valueid;
-  std::ostream &os;
-  int depth = 0, bid = 0, vid = 0;
-public:
-  Printer(std::ostream &os): os(os) {}
-  int getBlockID(Block *block);
-  int getValueID(Value *value);
+// Helpers.
+Block *targetOf(Op *op);
+Block *elseOf(Op *op);
 
-  void print(Region *region);
-  void print(Block *block);
-  void print(Op *op);
-};
-  
 }
 
 #endif

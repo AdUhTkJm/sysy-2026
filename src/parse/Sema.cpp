@@ -12,7 +12,7 @@ using namespace ast;
 
 PointerType *Sema::decay(ArrayType *arrTy) {
   std::vector<int> dims;
-  for (int i = 1; i < arrTy->dims.size(); i++)
+  for (unsigned i = 1; i < arrTy->dims.size(); i++)
     dims.push_back(arrTy->dims[i]);
   if (!dims.size())
     return ctx.create<PointerType>(arrTy->base);
@@ -39,7 +39,7 @@ Type *Sema::infer(ASTNode *node) {
     currentFunc = fnTy;
 
     SemanticScope scope(*this);
-    for (int i = 0; i < fn->args.size(); i++) {
+    for (unsigned i = 0; i < fn->args.size(); i++) {
       symbols[fn->args[i]] = fnTy->params[i];
     }
 
@@ -293,7 +293,7 @@ Type *Sema::infer(ASTNode *node) {
 
   if (auto call = dyn_cast<CallNode>(node)) {
     auto fnTy = cast<FunctionType>(symbols[call->func]);
-    for (size_t i = 0; i < fnTy->params.size(); i++) {
+    for (unsigned i = 0; i < fnTy->params.size(); i++) {
       ASTNode *&x = call->args[i];
       auto ty = infer(x);
       auto argTy = fnTy->params[i];
@@ -329,7 +329,7 @@ Type *Sema::infer(ASTNode *node) {
     
     access->arrTy = arrTy;
     std::vector<int> dimsNew;
-    for (int i = access->indices.size(); i < arrTy->dims.size(); i++)
+    for (unsigned i = access->indices.size(); i < arrTy->dims.size(); i++)
       dimsNew.push_back(arrTy->dims[i]);
     
     for (auto x : access->indices) {

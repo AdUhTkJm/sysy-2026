@@ -3,7 +3,9 @@
 #include "../parse/Parser.h"
 #include "../parse/Sema.h"
 
-#include "../ir/Ops.h"
+#include "../ir/CodeGen.h"
+#include "../ir/Printer.h"
+#include "../ir/Ops.h" // IWYU pragma: keep
 
 #include <fstream>
 #include <sstream>
@@ -12,8 +14,6 @@
 Options opts;
 
 int main(int argc, char **argv) {
-  std::cout << ir::ModuleOp::mnemonic << "\n";
-
   opts = parseArgs(argc, argv);
 
   // Read input file.
@@ -34,6 +34,8 @@ int main(int argc, char **argv) {
   ast::ASTNode *node = parser.parse();
   ast::Sema sema(node, ctx);
 
-  
+  ir::CodeGen cg;
+  auto module = cg.emitModule(node);
+  std::cout << module << "\n";
   return 0;
 }
