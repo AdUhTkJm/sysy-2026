@@ -35,7 +35,7 @@ std::ostream &operator<<(std::ostream &os, ConstValue value) {
 std::ostream &operator<<(std::ostream &os, const std::vector<int> vec) {
   if (vec.size() > 0)
     os << vec[0];
-  for (int i = 1; i < vec.size(); i++)
+  for (unsigned i = 1; i < vec.size(); i++)
     os << ", " << vec[i];
   return os;
 }
@@ -190,7 +190,7 @@ void *Parser::getArrayInit(const std::vector<int> &dims, bool expectFloat, bool 
 
       // Bump `place[addAt]`, and set everything after it to 0.
       place[addAt]++;
-      for (int i = addAt + 1; i < dims.size(); i++)
+      for (unsigned i = addAt + 1; i < dims.size(); i++)
         place[i] = 0;
       if (!peek(Token::RBrace))
         carry(place);

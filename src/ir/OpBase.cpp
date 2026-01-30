@@ -19,6 +19,7 @@ Type *ir::i64 = new Type(Type::i64);
 Type *ir::f32 = new Type(Type::f32);
 Type *ir::vi4 = new Type(Type::vi4);
 Type *ir::vf4 = new Type(Type::vf4);
+Type *ir::unit = new Type(Type::unit);
 
 void Block::insert(iterator at, Op *op) {
   op->parent = this;

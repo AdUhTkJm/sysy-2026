@@ -11,5 +11,5 @@ file(GLOB_RECURSE SRC_FILES CONFIGURE_DEPENDS
 add_executable(hcc ${SRC_FILES})
 
 target_compile_options(hcc PRIVATE
-  -Wall -Wextra -Wpedantic -fno-exceptions -fno-rtti
+  -Wall -Wextra -Wpedantic -fno-exceptions -fno-rtti -g
 )

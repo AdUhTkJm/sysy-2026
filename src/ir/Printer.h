@@ -7,27 +7,32 @@
 namespace ir {
 
 class Printer {
-  std::unordered_map<Block *, int> blockid;
-  std::unordered_map<Value *, int> valueid;
+  std::unordered_map<const Block *, int> blockid;
+  std::unordered_map<const Value *, int> valueid;
   std::ostream &os;
   int depth = 0, bid = 0, vid = 0;
 
-  using Print = void (*)(std::ostream &, Op *op, Printer *printer);
+  using Print = void (*)(std::ostream &, const Op *op, Printer *printer);
   using PrintMap = std::unordered_map<size_t, Printer::Print>;
+  using AttrPrint = void (*)(std::ostream &os, const Attr *attr, Printer *printer);
+  using AttrPrintMap = std::unordered_map<size_t, AttrPrint>;
+
   static PrintMap &dispatch();
+  static AttrPrintMap &attrDispatch();
   void indent();
-  void printImpl(Block *bb, bool tag);
+  void printImpl(const Block *bb, bool tag);
 public:
   Printer(std::ostream &os): os(os) {}
-  int id(Block *block);
-  int id(Value *value);
+  int id(const Block *block);
+  int id(const Value *value);
 
-  void print(Region *region);
-  void print(Block *block);
-  void print(Op *op);
+  void print(const Region *region);
+  void print(const Block *block);
+  void print(const Op *op);
+  void print(const Attr *attr);
 
-  void printResults(Op *op, unsigned from = 0);
-  void printOperands(Op *op, unsigned from = 0);
+  void printResults(const Op *op, unsigned from = 0);
+  void printOperands(const Op *op, unsigned from = 0);
   void printType(const Type *type);
 
   void reset();

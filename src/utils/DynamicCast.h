@@ -6,7 +6,7 @@
 
 template<class T, class U> __requires((std::derived_from<T, U>))
 bool isa(U *t) {
-  return T::classof(t);
+  return t ? T::classof(t) : false;
 }
 
 template<class T, class U> __requires((std::derived_from<T, U>))

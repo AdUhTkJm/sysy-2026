@@ -12,11 +12,15 @@ public: \
 #define empty_op_list(X) \
   X(ModuleOp) X(AddIOp) X(SubIOp) X(MulIOp) X(DivIOp) X(ModIOp) \
   X(AndIOp) X(OrIOp) X(XorIOp) X(ReturnOp) X(ForOp) \
-  X(WhileOp) X(IfOp) X(AllocaOp) X(LoadOp) X(StoreOp)
+  X(WhileOp) X(IfOp) X(AllocaOp) X(LoadOp) X(StoreOp) \
+  X(ArrayStoreOp) X(ArrayLoadOp) X(CallOp) X(GlobalArrayOp) \
+  X(GetGlobalOp) X(EqOp) X(NeOp) X(LtOp) X(LeOp) X(NotOp) \
+  X(YieldOp) X(ConditionOp) X(I2FOp) X(F2IOp) X(UndefOp) \
+  X(DoWhileOp) \
 
 #define complete_op_list(X) \
   empty_op_list(X) X(BranchOp) X(JumpOp) X(PhiOp) X(IntOp) \
-  X(FuncOp) X(FloatOp)
+  X(FuncOp) X(FloatOp) X(GlobalOp) X(ExternCallOp) \
 
 namespace ir {
 
@@ -46,6 +50,12 @@ public:
   Block *target;
 };
 
+class ExternCallOp : public OpImpl<ExternCallOp> {
+public:
+  constructor(ExternCallOp);
+  std::string name;
+};
+
 // The first return value is its handle,
 // and the rest are function arguments.
 class FuncOp : public OpImpl<FuncOp> {
@@ -56,6 +66,12 @@ public:
   Value *getHandle() const;
   std::vector<Value*> getArgs() const;
   Value *getArg(unsigned i) const;
+};
+
+class GlobalOp : public OpImpl<GlobalOp> {
+public:
+  constructor(GlobalOp);
+  std::string name;
 };
 
 class PhiOp : public OpImpl<PhiOp> {

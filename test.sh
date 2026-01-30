@@ -37,7 +37,7 @@ if [[ ! -d $build ]]; then
   cmake -S . -B build
 fi
 cd build
-make
+make -j$(nproc)
 cd ..
 
 if [[ -n $testcase ]]; then
@@ -61,6 +61,6 @@ if [[ -n $testcase ]]; then
   fi
   ret=$?
   if [[ $ret -ne 0 ]]; then
-    die "compile error: returned $ret"
+    die "hcc error: returned $ret"
   fi
 fi

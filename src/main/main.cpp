@@ -5,13 +5,19 @@
 
 #include "../ir/CodeGen.h"
 #include "../ir/Printer.h"
-#include "../ir/Ops.h" // IWYU pragma: keep
+
+#include "../opt/high/Passes.h"
 
 #include <fstream>
 #include <sstream>
 #include <iostream>
 
 Options opts;
+
+void populate(opt::PassManager &pm) {
+  add_pass(EnsureTerminator);
+  add_pass(Mem2Reg);
+}
 
 int main(int argc, char **argv) {
   opts = parseArgs(argc, argv);
@@ -36,6 +42,10 @@ int main(int argc, char **argv) {
 
   ir::CodeGen cg;
   auto module = cg.emitModule(node);
+
+  opt::PassManager pm(module, opts);
+  populate(pm);
+  pm.run();
   std::cout << module << "\n";
   return 0;
 }

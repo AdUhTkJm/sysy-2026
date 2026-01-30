@@ -30,19 +30,21 @@ struct Type {
   static void operator delete[](void*) noexcept = delete;
 
   enum Kind {
-    i32, i64, f32, vi4, vf4, ptr, fn
+    i32, i64, f32, vi4, vf4, ptr, fn, unit
   } kind;
-  std::vector<Type*> subtypes;
+  std::vector<const Type*> subtypes;
 
   Type() {}
   Type(Kind kind): kind(kind) { assert(kind != ptr && kind != fn); }
-  Type(Kind kind, const std::vector<Type*> &subtypes): kind(kind), subtypes(subtypes) {}
-  Type *pointee() const { assert(subtypes.size() >= 1); return subtypes.front(); }
-  Type *retType() const { assert(subtypes.size() >= 1); return subtypes.front(); }
+  Type(Kind kind, const std::vector<const Type*> &subtypes): kind(kind), subtypes(subtypes) {}
+  const Type *pointee() const { assert(subtypes.size() >= 1); return subtypes.front(); }
+  const Type *retType() const { assert(subtypes.size() >= 1); return subtypes.front(); }
   auto argTypes() const { assert(subtypes.size() >= 1); return std::vector(subtypes.begin() + 1, subtypes.end()); }
+
+  static Type *pointer(const Type *pointee) { return new Type(ptr, { pointee }); }
 };
 
-extern Type *i32, *i64, *f32, *vi4, *vf4;
+extern Type *i32, *i64, *f32, *vi4, *vf4, *unit;
 
 class Value {
   std::multiset<Op*> uses;
@@ -104,6 +106,8 @@ public:
   // Implicitly append a block to the region.
   Region *appendRegion();
   void removeRegion(Region *region);
+  Region *getRegion(int i = 0) const { return regions[i]; }
+  size_t getNumRegions() const { return regions.size(); }
 
   Block *createFirstBlock();
 
@@ -136,7 +140,7 @@ public:
   const auto &getOperands() const { return operands; }
   const auto &getAttrs() const { return attrs; }
 
-  Value *val(unsigned i) const { assert(i < operands.size()); return operands[i]; }
+  Value *val(unsigned i = 0) const { assert(i < operands.size()); return operands[i]; }
   Value *ret(unsigned i = 0) const { assert(i < results.size()); return results[i]; }
 
   template<class T>
@@ -146,10 +150,18 @@ public:
     return it == attrs.end() ? nullptr : cast<T>(it->second);
   }
 
-  template<class T>
+  template<class T> __requires((std::derived_from<T, Attr>))
   void set(const Attr *attr) {
     std::string name(T::getMnemonics());
     attrs[name] = attr;
+  }
+
+  template<class T, class ...Args> __requires(
+    (std::derived_from<T, Attr>) &&
+    (requires(Args ...args) { T(args...); })
+  )
+  void set(Args ...args) {
+    set<T>(new T(args...));
   }
 };
 
@@ -230,12 +242,13 @@ public:
 
   bool dominatedBy(const Block *bb) const;
   bool dominates(const Block *bb) const { return bb->dominatedBy(this); }
-  auto getOps() { return ops; }
-  auto getOpCount() { return ops.size(); }
-  Op *getFirstOp() { return ops.front(); }
-  Op *getLastOp() { return ops.back(); }
+  const auto &getOps() const { return ops; }
+  auto &getOps() { return ops; }
+  auto getOpCount() const { return ops.size(); }
+  Op *getFirstOp() const { assert(ops.size() > 0); return ops.front(); }
+  Op *getLastOp() const { assert(ops.size() > 0); return ops.back(); }
 
-  const auto &getDominanceFrontier() { return domFront; }
+  const auto &getDominanceFrontier() const { return domFront; }
 
   void erase();
   
@@ -265,6 +278,8 @@ public:
   Block *getFirstBlock() const { return bbs.front(); }
   Block *getLastBlock() const { return bbs.back(); }
 
+  Op *getLastOp() const { return getLastBlock()->getLastOp(); }
+
   struct MoveResult {
     Block *first, *last;
   };
@@ -292,6 +307,9 @@ public:
 // Helpers.
 Block *targetOf(Op *op);
 Block *elseOf(Op *op);
+
+using Types = std::vector<const Type*>;
+using Values = std::vector<Value*>;
 
 }
 

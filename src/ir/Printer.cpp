@@ -8,7 +8,7 @@ namespace ir {
 
 Printer printer(std::cerr);
 
-void printWithFormat(std::ostream &os, Op *op, Printer *printer, const char *fmt) {
+void printWithFormat(std::ostream &os, const Op *op, Printer *printer, const char *fmt) {
   for (const char *p = fmt; *p;) {
     if (*p != '$') {
       os << *p++;
@@ -19,6 +19,11 @@ void printWithFormat(std::ostream &os, Op *op, Printer *printer, const char *fmt
     switch (*p++) {
     // Operands.
     case 'x': {
+      if (*p == '>') {
+        p++;
+        printer->printOperands(op, *p++ - '0');
+        break;
+      }
       int index = *p++ - '0';
       if (*p == '?') {
         p++;
@@ -56,7 +61,7 @@ void printWithFormat(std::ostream &os, Op *op, Printer *printer, const char *fmt
   }
 }
 
-void Printer::printResults(Op *op, unsigned from) {
+void Printer::printResults(const Op *op, unsigned from) {
   for (size_t i = from; i < op->getNumResults(); i++) {
     os << '%' << id(op->ret(i));
     if (i != op->getNumResults() - 1)
@@ -64,7 +69,7 @@ void Printer::printResults(Op *op, unsigned from) {
   }
 }
 
-void Printer::printOperands(Op *op,  unsigned from) {
+void Printer::printOperands(const Op *op,  unsigned from) {
   for (size_t i = from; i < op->getNumOperands(); i++) {
     os << '%' << id(op->val(i));
     if (i != op->getNumOperands() - 1)
@@ -89,6 +94,9 @@ void Printer::printType(const Type *type) {
   case Type::vf4:
     os << "vf4";
     break;
+  case Type::unit:
+    os << "unit";
+    break;
   case Type::ptr:
     printType(type->pointee());
     os << "*";
@@ -107,7 +115,8 @@ void Printer::printType(const Type *type) {
   }
 }
 
-#define printer(Ty) void print##Ty(std::ostream &os, Op *op, Printer *printer)
+#define printer(Ty) void print##Ty(std::ostream &os, const Op *op, Printer *printer)
+#define attr_printer(Ty) void print##Ty(std::ostream &os, const Attr *attr, [[gnu::unused]] Printer *printer)
 
 #define format(Ty, string) printer(Ty) { \
   printWithFormat(os, op, printer, string);\
@@ -121,18 +130,61 @@ format(ModIOp, "$r0 = $x0 % $x1");
 format(AndIOp, "$r0 = $x0 & $x1");
 format(OrIOp , "$r0 = $x0 | $x1");
 format(XorIOp, "$r0 = $x0 ^ $x1");
+format(EqOp, "$r0 = $x0 == $x1");
+format(NeOp, "$r0 = $x0 != $x1");
+format(LtOp, "$r0 = $x0 < $x1");
+format(LeOp, "$r0 = $x0 <= $x1");
+format(NotOp, "$r0 = ! $x0");
 format(ReturnOp, "return $x0?");
 format(ModuleOp, "module");
 format(IfOp, "$r>0 = if $x0");
-format(WhileOp, "$r>0 = while $x0");
+format(WhileOp, "$r>0 = while");
 format(ForOp, "$r>1 = for $r0 in range($x0, $x1, $x2)");
 format(LoadOp, "$r0 = load $x0");
-format(StoreOp, "store $x0, $x1");
+format(StoreOp, "store [$x0], $x1");
+format(CallOp, "$r0 = $x0($x>1)");
+format(GetGlobalOp, "$r0 = la $x0");
+format(GlobalArrayOp, "$r0: $tr0");
+format(YieldOp, "yield $x>0");
+format(ConditionOp, "condition($x0); $x>1");
+format(I2FOp, "$r0 = (f32) $x0");
+format(F2IOp, "$r0 = (i32) $x0");
+format(UndefOp, "$r0 = undef $tr0");
+format(DoWhileOp, "$r>0 = do-while");
+
+printer(ExternCallOp) {
+  auto extc = cast<ExternCallOp>(op);
+  printer->printResults(op);
+  if (extc->getNumResults() > 0)
+    os << " = ";
+  os << extc->name << "(";
+  printer->printOperands(op);
+  os << ')';
+}
+
+printer(GlobalOp) {
+  auto glob = cast<GlobalOp>(op);
+  os << '%' << printer->id(glob->ret()) << " = " << glob->name << ": ";
+  printer->printType(glob->ret()->type);
+}
 
 printer(AllocaOp) {
   auto ret = op->ret();
   os << '%' << printer->id(ret) << " = alloca ";
   printer->printType(ret->type->pointee());
+}
+
+printer(ArrayStoreOp) {
+  os << "store %" << printer->id(op->val(0));
+  for (unsigned i = 1; i < op->getNumOperands() - 1; i++)
+    os << "[%" << printer->id(op->val(i)) << ']';
+  os << ", %" << printer->id(op->getOperands().back());
+}
+
+printer(ArrayLoadOp) {
+  os << '%' << printer->id(op->ret()) << " = %" << printer->id(op->val(0));
+  for (unsigned i = 1; i < op->getNumOperands(); i++)
+    os << "[%" << printer->id(op->val(i)) << ']';
 }
 
 printer(FuncOp) {
@@ -179,6 +231,42 @@ printer(PhiOp) {
     os << "[ " << printer->id(value) << ", bb" << printer->id(block) << " ] ";
 }
 
+attr_printer(IntAttr) {
+  os << "<" << cast<IntAttr>(attr)->i << ">";
+}
+
+attr_printer(SizeAttr) {
+  os << "<size = " << cast<SizeAttr>(attr)->size << ">";
+}
+
+attr_printer(DimAttr) {
+  os << "<dims = " << cast<DimAttr>(attr)->dims << ">";
+}
+
+attr_printer(ConstIArrAttr) {
+  auto iarr = cast<ConstIArrAttr>(attr);
+  os << "<arr = ";
+  if (iarr->value.size() > 0)
+    os << iarr->value[0];
+  for (unsigned i = 1; i < iarr->value.size() - iarr->zeroSuffix; i++)
+    os << ", " << iarr->value[i];
+  if (iarr->zeroSuffix > 0)
+    os << ", " << iarr->zeroSuffix << " x 0";
+  os << ">"; 
+}
+
+attr_printer(ConstFArrAttr) {
+  auto farr = cast<ConstFArrAttr>(attr);
+  os << "<arr = ";
+  if (farr->value.size() > 0)
+    os << farr->value[0];
+  for (unsigned i = 1; i < farr->value.size() - farr->zeroSuffix; i++)
+    os << ", " << farr->value[i];
+  if (farr->zeroSuffix > 0)
+    os << ", " << farr->zeroSuffix << " x 0";
+  os << ">"; 
+}
+
 #define map_entry(Ty) { Ty::identifier(), print##Ty },
 
 Printer::PrintMap &Printer::dispatch() {
@@ -187,13 +275,19 @@ Printer::PrintMap &Printer::dispatch() {
   };
   return map;
 }
+Printer::AttrPrintMap &Printer::attrDispatch() {
+  static AttrPrintMap map {
+    attr_list(map_entry)
+  };
+  return map;
+}
 
-int Printer::id(Block *block) {
+int Printer::id(const Block *block) {
   auto it = blockid.find(block);
   return it == blockid.end() ? blockid[block] = bid++ : it->second;
 }
 
-int Printer::id(Value *value) {
+int Printer::id(const Value *value) {
   auto it = valueid.find(value);
   return it == valueid.end() ? valueid[value] = vid++ : it->second;
 }
@@ -203,7 +297,7 @@ void Printer::indent() {
     os << "  ";
 }
 
-void Printer::printImpl(Block *bb, bool tag) {
+void Printer::printImpl(const Block *bb, bool tag) {
   if (tag) {
     depth--;
     indent();
@@ -215,11 +309,11 @@ void Printer::printImpl(Block *bb, bool tag) {
     print(op);
 }
 
-void Printer::print(Block *bb) {
+void Printer::print(const Block *bb) {
   printImpl(bb, true);
 }
 
-void Printer::print(Region *region) {
+void Printer::print(const Region *region) {
   depth++;
   os << " {\n";
   bool tag = region->getNumBlocks() != 1;
@@ -231,14 +325,23 @@ void Printer::print(Region *region) {
   os << "}";
 }
 
-void Printer::print(Op *op) {
+void Printer::print(const Op *op) {
   indent();
   auto printfn = dispatch()[op->id];
   assert(printfn);
   printfn(os, op, this);
+  for (const auto &[_, attr] : op->getAttrs())
+    print(attr);
   for (auto r : op->getRegions())
     print(r);
   os << '\n';
+}
+
+void Printer::print(const Attr *attr) {
+  os << ' ';
+  auto printfn = attrDispatch()[attr->id];
+  assert(printfn);
+  printfn(os, attr, this);
 }
 
 void Printer::reset() {

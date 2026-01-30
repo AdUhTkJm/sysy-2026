@@ -8,10 +8,12 @@ namespace ir {
 
 class CodeGen {
   using SymbolTable = std::map<std::string, Value*>;
-  SymbolTable table;
+  SymbolTable table, globals;
   Builder builder;
   ModuleOp *module;
 
+  static constexpr std::string constructor = "__init";
+  static const std::map<std::string, Type *> external;
 public:
   class Guard {
     CodeGen *cg;

@@ -28,10 +28,16 @@ public:
     ~Guard() { builder.bb = bb; builder.at = at; }
   };
 
+  Builder() {}
+  Builder(Op *op) { setBefore(op); }
+
   void setBefore(Op *op);
   void setAfter(Op *op);
   void setToStart(Block *block);
   void setToEnd(Block *block);
+  void setToStart(Region *region) { setToStart(region->getFirstBlock()); }
+  void setToEnd(Region *region) { setToEnd(region->getLastBlock()); }
+
 
   template<class T, class ...Types> __requires(
     (std::derived_from<T, OpImpl<T>> &&
@@ -44,7 +50,7 @@ public:
     return t;
   }
   template<class T> __requires((std::derived_from<T, OpImpl<T>>))
-  T *create(const std::vector<Type*> &types) {
+  T *create(const std::vector<const Type*> &types) {
     T *t = new T(bb, at);
     for (auto [i, ty] : data::enumerate(types))
       t->results.push_back(new Value(ty, t, i));

@@ -53,6 +53,22 @@ void concat(std::vector<T> &a, const std::vector<T> &b) {
     a.push_back(x);
 }
 
+template<class T>
+class Reverser {
+  const T &t;
+public:
+  explicit Reverser(const T &t): t(t) {}
+  using iterator = decltype(std::rbegin(std::declval<const T&>()));
+
+  iterator begin() { return std::rbegin(t); }
+  iterator end() { return std::rend(t); }
+};
+
+template<class T>
+auto reverse(const T &t) {
+  return Reverser<T>(t);
+}
+
 }
 
 #endif

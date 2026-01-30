@@ -2,8 +2,12 @@
 #define ATTR_H
 
 #include "../utils/Meta.h"
+#include "../utils/DataStructure.h"
 
 namespace ir {
+
+#define attr_list(X) \
+  X(IntAttr) X(SizeAttr) X(DimAttr) X(ConstIArrAttr) X(ConstFArrAttr)
 
 class Block;
   
@@ -20,11 +24,12 @@ class AttrImpl : public Attr {
     return &p;
   }
 public:
+  static unsigned long identifier() { return (unsigned long) unique(); }
   static constexpr auto mnemonic = meta::name<T>();
   static const char *getMnemonics() { return mnemonic.data; }
-  static bool classof(const Attr *attr) { return attr->id == (unsigned long) unique(); }
+  static bool classof(const Attr *attr) { return attr->id == identifier(); }
 
-  AttrImpl(): Attr((unsigned long) unique()) {}
+  AttrImpl(): Attr(identifier()) {}
 };
 
 class IntAttr : public AttrImpl<IntAttr> {
@@ -32,6 +37,52 @@ public:
   int i;
   IntAttr(int i): i(i) {}
 };
+
+class SizeAttr : public AttrImpl<SizeAttr> {
+public:
+  size_t size;
+  SizeAttr(size_t size): size(size) {}
+};
+
+class DimAttr : public AttrImpl<DimAttr> {
+public:
+  std::vector<int> dims;
+  DimAttr(const std::vector<int> &dims): dims(dims) {}
+};
+
+class ConstIArrAttr : public AttrImpl<ConstIArrAttr> {
+public:
+  std::vector<int> value;
+  size_t zeroSuffix;
+
+  ConstIArrAttr(const std::vector<int> &value): value(value), zeroSuffix(0) {
+    for (auto x : data::reverse(value)) {
+      if (x != 0)
+        break;
+      zeroSuffix++;
+    }
+  }
+
+  bool allZeroes() const { return zeroSuffix == value.size(); }
+};
+
+class ConstFArrAttr : public AttrImpl<ConstFArrAttr> {
+public:
+  std::vector<float> value;
+  size_t zeroSuffix;
+
+  ConstFArrAttr(const std::vector<float> &value): value(value), zeroSuffix(0) {
+    for (auto x : data::reverse(value)) {
+      if (x != 0)
+        break;
+      zeroSuffix++;
+    }
+  }
+
+  bool allZeroes() const { return zeroSuffix == value.size(); }
+};
+
+using Attributes = std::vector<const Attr*>;
 
 }
 
