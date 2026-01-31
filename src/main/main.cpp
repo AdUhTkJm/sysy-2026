@@ -8,6 +8,7 @@
 
 #include "../opt/high/Passes.h"
 #include "../opt/mid/Passes.h"
+#include "../opt/low/Passes.h"
 
 #include <fstream>
 #include <sstream>
@@ -16,9 +17,16 @@
 Options opts;
 
 void populate(opt::PassManager &pm) {
+  // High-IR passes.
   add_pass(EnsureTerminator);
   add_pass(Mem2Reg);
+  add_pass(HighDCE);
+
+  // Mid-IR passes.
   add_pass(Flatten);
+
+  // Low-IR passes.
+  add_pass(Lower);
 }
 
 int main(int argc, char **argv) {

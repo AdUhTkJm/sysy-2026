@@ -6,7 +6,7 @@
 
 namespace ir {
 
-Printer printer(std::cerr);
+Printer printer;
 
 void printWithFormat(std::ostream &os, const Op *op, Printer *printer, const char *fmt) {
   for (const char *p = fmt; *p;) {
@@ -30,11 +30,12 @@ void printWithFormat(std::ostream &os, const Op *op, Printer *printer, const cha
         if (op->getNumOperands() <= (unsigned) index)
           break;
       }
-      os << '%' << printer->id(op->val(index));
+      os << printer->str(op->val(index));
       break;
     }
     // Results.
-    case 'r': {
+    case 'r':
+    case 'R': {
       if (*p == '>') {
         p++;
         printer->printResults(op, *p++ - '0');
@@ -44,7 +45,7 @@ void printWithFormat(std::ostream &os, const Op *op, Printer *printer, const cha
         break;
       }
       Value *v = op->ret(*p++ - '0');
-      os << '%' << printer->id(v);
+      os << printer->str(v);
       break;
     }
     case 't': {
@@ -123,9 +124,14 @@ void Printer::printType(const Type *type) {
 }
 
 format(AddIOp, "$r0 = $x0 + $x1");
+format(AddLOp, "$r0 = $x0 + $x1: i64");
+format(AddFOp, "$r0 = $x0 + $x1: f32");
 format(SubIOp, "$r0 = $x0 - $x1");
+format(SubFOp, "$r0 = $x0 - $x1: f32");
 format(MulIOp, "$r0 = $x0 * $x1");
+format(MulFOp, "$r0 = $x0 * $x1: f32");
 format(DivIOp, "$r0 = $x0 / $x1");
+format(DivFOp, "$r0 = $x0 / $x1: f32");
 format(ModIOp, "$r0 = $x0 % $x1");
 format(AndIOp, "$r0 = $x0 & $x1");
 format(OrIOp , "$r0 = $x0 | $x1");
@@ -151,6 +157,65 @@ format(I2FOp, "$r0 = (f32) $x0");
 format(F2IOp, "$r0 = (i32) $x0");
 format(UndefOp, "$r0 = undef $tr0");
 format(DoWhileOp, "$r>0 = do-while $x>0");
+/* ARM operations */
+format(AddWOp, "add $r0, $x0, $x1");
+format(AddXOp, "add $R0, $X0, $X1");
+format(SubWOp, "sub $r0, $x0, $x1");
+format(SubXOp, "sub $R0, $X0, $X1");
+format(MulWOp, "mul $r0, $x0, $x1");
+format(MulXOp, "mul $R0, $X0, $X1");
+format(DivWOp, "div $r0, $x0, $x1");
+format(DivXOp, "div $R0, $X0, $X1");
+format(CmpEqOp, "cmp.eq $r0, $x0, $x1");
+format(CmpNeOp, "cmp.ne $r0, $x0, $x1");
+format(CmpLtOp, "cmp.lt $r0, $x0, $x1");
+format(CmpLeOp, "cmp.le $r0, $x0, $x1");
+
+printer(AddWIOp) {
+  auto addwi = cast<AddWIOp>(op);
+  os << "add " << printer->str(op->ret()) << ", " << printer->str(op->val()) << ", #" << addwi->value;
+}
+
+printer(AddXIOp) {
+  auto addwi = cast<AddWIOp>(op);
+  os << "add " << printer->str(op->ret(), 1) << ", " << printer->str(op->val(), 1) << ", #" << addwi->value;
+}
+
+printer(MovIOp) {
+  auto movi = cast<MovIOp>(op);
+  os << "mov " << printer->str(op->ret()) << ", #" << movi->value;
+}
+
+printer(BOp) {
+  auto jmp = cast<BOp>(op);
+  os << "b " << printer->str(jmp->target);
+}
+
+printer(BlOp) {
+  (void) printer;
+  auto call = cast<BlOp>(op);
+  os << "bl " << call->name;
+  if (op->getNumOperands() > 0) {
+    os << "(";
+    printer->printOperands(op);
+    os << ")";
+  }
+}
+
+#define arm_branch_printer(Ty) \
+  printer(Ty) { \
+    auto br = cast<Ty>(op); \
+    std::string x = #Ty; \
+    x[0] = tolower(x[0]); \
+    x = x.substr(0, x.size() - 2); /* Remove the final 'Op' */ \
+    os << x << ' '; \
+    printer->printOperands(op); \
+    os << ", " << printer->str(br->target); \
+    if (br->other) \
+      os << ", " << printer->str(br->other); \
+  }
+
+arm_branch_op_list(arm_branch_printer)
 
 printer(ExternCallOp) {
   auto extc = cast<ExternCallOp>(op);
@@ -164,34 +229,34 @@ printer(ExternCallOp) {
 
 printer(GlobalOp) {
   auto glob = cast<GlobalOp>(op);
-  os << '%' << printer->id(glob->ret()) << " = " << glob->name << ": ";
+  os << printer->str(glob->ret()) << " = " << glob->name << ": ";
   printer->printType(glob->ret()->type);
 }
 
 printer(AllocaOp) {
   auto ret = op->ret();
-  os << '%' << printer->id(ret) << " = alloca ";
+  os << printer->str(ret) << " = alloca ";
   printer->printType(ret->type->pointee());
 }
 
 printer(ArrayStoreOp) {
-  os << "store %" << printer->id(op->val(0));
+  os << "store " << printer->str(op->val(0));
   for (unsigned i = 1; i < op->getNumOperands() - 1; i++)
-    os << "[%" << printer->id(op->val(i)) << ']';
-  os << ", %" << printer->id(op->getOperands().back());
+    os << "[" << printer->str(op->val(i)) << ']';
+  os << ", " << printer->str(op->getOperands().back());
 }
 
 printer(ArrayLoadOp) {
-  os << '%' << printer->id(op->ret()) << " = %" << printer->id(op->val(0));
+  os << printer->str(op->ret()) << " = " << printer->str(op->val(0));
   for (unsigned i = 1; i < op->getNumOperands(); i++)
-    os << "[%" << printer->id(op->val(i)) << ']';
+    os << "[" << printer->str(op->val(i)) << ']';
 }
 
 printer(FuncOp) {
   auto fn = cast<FuncOp>(op);
-  os << "func " << fn->name << " = %";
+  os << "func " << fn->name << " = ";
   // Print the function handle.
-  os << printer->id(fn->getHandle());
+  os << printer->str(fn->getHandle());
   // Print argument list.
   os << "(";
   printer->printResults(fn, 1);
@@ -199,16 +264,16 @@ printer(FuncOp) {
 }
 
 printer(IntOp) {
-  os << '%' << printer->id(op->ret(0)) << " = " << cast<IntOp>(op)->value;
+  os << printer->str(op->ret(0)) << " = " << cast<IntOp>(op)->value;
 }
 
 printer(FloatOp) {
-  os << '%' << printer->id(op->ret(0)) << " = " << cast<FloatOp>(op)->value;
+  os << printer->str(op->ret(0)) << " = " << cast<FloatOp>(op)->value;
 }
 
 printer(JumpOp) {
   auto jmp = cast<JumpOp>(op);
-  os << "=> bb" << printer->id(jmp->target);
+  os << "=> " << printer->str(jmp->target);
   if (jmp->getNumOperands() > 0) {
     os << "(";
     printer->printOperands(jmp);
@@ -218,7 +283,7 @@ printer(JumpOp) {
 
 printer(BranchOp) {
   auto br = cast<BranchOp>(op);
-  os << "=> %" << printer->id(op->val(0)) << " ? bb" << printer->id(br->target) << " : bb" << printer->id(br->other);
+  os << "=> " << printer->str(op->val(0)) << " ? " << printer->str(br->target) << " : " << printer->str(br->other);
   if (br->getNumOperands() > 1) {
     os << " with ";
     printer->printOperands(br, 1);
@@ -229,7 +294,7 @@ printer(PhiOp) {
   auto phi = cast<PhiOp>(op);
   os << "phi ";
   for (auto [value, block] : *phi)
-    os << "[ " << printer->id(value) << ", bb" << printer->id(block) << " ] ";
+    os << "[ " << printer->str(value) << ", " << printer->str(block) << " ] ";
 }
 
 attr_printer(IntAttr) {
@@ -268,17 +333,18 @@ attr_printer(ConstFArrAttr) {
   os << ">"; 
 }
 
-#define map_entry(Ty) { Ty::identifier(), print##Ty },
+#define op_map_entry(Ty) { Ty::id, print##Ty },
+#define attr_map_entry(Ty) { Ty::identifier(), print##Ty },
 
 Printer::PrintMap &Printer::dispatch() {
   static PrintMap map {
-    complete_op_list(map_entry)
+    complete_op_list(op_map_entry)
   };
   return map;
 }
 Printer::AttrPrintMap &Printer::attrDispatch() {
   static AttrPrintMap map {
-    attr_list(map_entry)
+    attr_list(attr_map_entry)
   };
   return map;
 }
@@ -293,6 +359,24 @@ int Printer::id(const Value *value) {
   return it == valueid.end() ? valueid[value] = vid++ : it->second;
 }
 
+std::string Printer::str(const Value *value, bool isWide) {
+  auto it = idents.find(value);
+  if (it == idents.end())
+    return "%" + std::to_string(id(value));
+  
+  if (!isWide)
+    return it->second;
+
+  auto v = it->second;
+  if (v[0] == 'w')
+    v[0] = 'x';
+  return v;
+}
+
+std::string Printer::str(const Block *block) {
+  return bbPrefix + std::to_string(id(block));
+}
+
 void Printer::indent() {
   for (int i = 0; i < depth; i++)
     os << "  ";
@@ -300,14 +384,14 @@ void Printer::indent() {
 
 void Printer::printImpl(const Block *bb, bool tag) {
   auto numArgs = bb->getNumArgs();
-  if (tag || numArgs != 0) {
+  if (tag || numArgs != 0 || bbPrefix != "bb") {
     depth--;
     indent();
-    os << "bb" << id(bb);
+    os << str(bb);
     if (numArgs > 0) {
-      os << "(%" << id(bb->arg(0));
+      os << "(" << str(bb->arg(0));
       for (unsigned i = 1; i < numArgs; i++)
-        os << ", %" << id(bb->arg(i));
+        os << ", " << str(bb->arg(i));
       os << ")";
     }
     os << ":\n";
@@ -359,18 +443,27 @@ void Printer::reset() {
   valueid.clear();
 }
 
+void Printer::dump(std::ostream &out) {
+  out << os.str();
+  os.str("");
+  os.clear();
+}
+
 std::ostream &operator<<(std::ostream &os, Op *op) {
   printer.print(op);
+  printer.dump(os);
   return os;
 }
 
 std::ostream &operator<<(std::ostream &os, Block *bb) {
   printer.print(bb);
+  printer.dump(os);
   return os;
 }
 
 std::ostream &operator<<(std::ostream &os, Region *region) {
   printer.print(region);
+  printer.dump(os);
   return os;
 }
 

@@ -78,6 +78,7 @@ public:
 
   Value *getResult(int i = 0) const { return results[i]; }
   const auto &getResults() const { return results; }
+  std::vector<const Type*> getResultTypes() const;
   size_t getNumResults() const { return results.size(); }
   size_t getNumOperands() const { return operands.size(); }
 
@@ -149,7 +150,7 @@ class Value {
   std::multiset<Op*> uses;
   
   friend class Op;
-  template<class T>
+  template<class T, int N>
   friend class OpImpl;
   friend class Block;
 public:
@@ -193,6 +194,7 @@ public:
   bool isOpResult() const { return opResult; }
 
   bool operator==(Value &other) const;
+  bool used() const { return uses.size() > 0; }
 
   static Arena arena;
   static void* operator new(size_t size) {
@@ -201,19 +203,15 @@ public:
   static void operator delete(void*) noexcept {}
 };
 
-template<class T>
+template<class T, int N>
 class OpImpl : public Op {
-  static char *unique() {
-    static char p;
-    return &p;
-  }
 public:
   static constexpr auto mnemonic = meta::name<T>();
   static const char *getMnemonics() { return mnemonic.data; }
-  static size_t identifier() { return (size_t) unique(); }
-  static bool classof(const Op *op) { return op->id == identifier(); }
+  static constexpr size_t id = N;
+  static bool classof(const Op *op) { return op->id == id; }
 
-  OpImpl(Block *parent, OpList::iterator place): Op(parent, place, identifier()) {}
+  OpImpl(Block *parent, OpList::iterator place): Op(parent, place, id) {}
   
   template<class ...Values> __requires((std::derived_from<std::remove_pointer_t<Values>, Value> && ...))
   T *with(Values ...values) {
@@ -283,12 +281,13 @@ public:
   size_t getNumArgs() const { return args.size(); }
   const auto &getArgs() const { return args; }
   auto &getArgs() { return args; }
+  void clearArgs() { args.clear(); }
 
   bool dominatedBy(const Block *bb) const;
   bool dominates(const Block *bb) const { return bb->dominatedBy(this); }
   const auto &getOps() const { return ops; }
   auto &getOps() { return ops; }
-  auto getOpCount() const { return ops.size(); }
+  auto getNumOps() const { return ops.size(); }
   Op *getFirstOp() const { assert(ops.size() > 0); return ops.front(); }
   Op *getLastOp() const { assert(ops.size() > 0); return ops.back(); }
 
@@ -341,6 +340,9 @@ public:
   void updateDomFront() const;
   void updatePDoms() const;
   void updateLiveness() const;
+
+  void convertToPhi();
+  void convertToBlockArguments();
 
   iterator begin() { return bbs.begin(); }
   iterator end() { return bbs.end(); }

@@ -1,6 +1,5 @@
-#include "OpBase.h"
 #include "Attrs.h"
-#include "Ops.h"
+#include "Builder.h"
 
 #include <deque>
 #include <unordered_map>
@@ -205,6 +204,14 @@ Block *Op::createFirstBlock() {
   return regions[0]->getFirstBlock();
 }
 
+std::vector<const Type*> Op::getResultTypes() const {
+  std::vector<const Type*> types;
+  types.reserve(results.size());
+  for (auto x : results)
+    types.push_back(x->type);
+  return types;
+}
+
 void Value::replaceAllUsesWith(Value *other) {
   for (auto use : uses) {
     for (auto &operand : use->operands) {
@@ -407,7 +414,7 @@ void Region::updatePreds() const {
   }
 
   for (auto bb : bbs) {
-    assert(bb->getOpCount() > 0);
+    assert(bb->getNumOps() > 0);
     auto last = bb->getLastOp();
     if (auto target = targetOf(last))
       target->preds.insert(bb);
@@ -763,16 +770,71 @@ void Region::updateLiveness() const {
   } while (changed);
 }
 
-Block *ir::targetOf(Op *op) {
-  if (auto br = dyn_cast<BranchOp>(op))
-    return br->target;
-  if (auto j = dyn_cast<JumpOp>(op))
-    return j->target;
-  return nullptr;
+void Region::convertToPhi() {
+  updatePreds();
+
+  Builder builder;
+  for (auto bb : bbs) {
+    builder.setToStart(bb);
+    for (auto [i, arg] : data::enumerate(bb->getArgs())) {
+      auto phi = builder.create<PhiOp>(arg->type);
+      std::cout << "pred count: " << bb->preds.size() << "\n";
+      for (auto p : bb->preds) {
+        auto last = p->getLastOp();
+        phi->addIncoming(last->val(i), p);
+      }
+      arg->replaceAllUsesWith(phi->ret());
+    }
+    bb->clearArgs();
+  }
 }
 
+void Region::convertToBlockArguments() {
+  updatePreds();
+
+  Builder builder;
+  for (auto bb : bbs) {
+    std::vector<PhiOp*> phis;
+    for (auto it = bb->begin(); it != bb->end(); ) {
+      auto next = it; next++;
+      auto phi = dyn_cast<PhiOp>(*it);
+      if (!phi)
+        break;
+
+      auto arg = bb->pushArgument(phi->ret()->type);
+      phi->ret()->replaceAllUsesWith(arg);
+
+      for (auto p : bb->preds) {
+        Value *v = phi->incomingFrom(p);
+        p->getLastOp()->pushOperand(v);
+      }
+      phi->erase();
+      it = next;
+    }
+  }
+}
+
+#define targetof(Ty) \
+  case (int) OpKind::Ty: \
+    return cast<Ty>(op)->target; \
+
+Block *ir::targetOf(Op *op) {
+  switch (op->id) {
+  targetful_op_list(targetof)
+  branch_op_list(targetof)
+  default:
+    return nullptr;
+  }
+}
+
+#define elseof(Ty) \
+  case (int) OpKind::Ty: \
+    return cast<Ty>(op)->other; \
+
 Block *ir::elseOf(Op *op) {
-  if (auto br = dyn_cast<BranchOp>(op))
-    return br->target;
-  return nullptr;
+  switch (op->id) {
+  branch_op_list(elseof)
+  default:
+    return nullptr;
+  }
 }

@@ -46,7 +46,7 @@ public:
   void setToEnd(Region *region) { setToEnd(region->getLastBlock()); }
 
   template<class T, class ...Types> __requires(
-    (std::derived_from<T, OpImpl<T>> &&
+    (std::derived_from<T, Op> &&
     (std::derived_from<std::remove_pointer_t<Types>, Type> && ...))
   )
   T *create(Types ...types) {
@@ -55,7 +55,7 @@ public:
     insert(t);
     return t;
   }
-  template<class T> __requires((std::derived_from<T, OpImpl<T>>))
+  template<class T> __requires((std::derived_from<T, Op>))
   T *create(const std::vector<const Type*> &types) {
     T *t = new T(bb, at);
     for (auto [i, ty] : data::enumerate(types))
@@ -65,7 +65,7 @@ public:
   }
 
   template<class T, class ...Types> __requires(
-    (std::derived_from<T, OpImpl<T>> &&
+    (std::derived_from<T, Op> &&
     (std::derived_from<std::remove_pointer_t<Types>, Type> && ...))
   )
   T *replace(Op *other, Types ...types) {
@@ -74,7 +74,7 @@ public:
     replaceImpl(t, other);
     return t;
   }
-  template<class T> __requires((std::derived_from<T, OpImpl<T>>))
+  template<class T> __requires((std::derived_from<T, Op>))
   T *replace(Op *other, const std::vector<const Type*> &types) {
     setBefore(other);
     T *t = create<T>(types);
@@ -82,20 +82,10 @@ public:
     return t;
   }
 
-  template<class T, class ...Types> __requires(
-    (std::derived_from<T, OpImpl<T>> &&
-    (std::derived_from<std::remove_pointer_t<Types>, Type> && ...))
-  )
-  T *rename(Op *other, Types ...types) {
+  template<class T> __requires((std::derived_from<T, Op>))
+  T *rename(Op *other) {
     setBefore(other);
-    T *t = create<T>(std::forward<Types>(types)...)->with(other->operands);
-    replaceImpl(t, other);
-    return t;
-  }
-  template<class T> __requires((std::derived_from<T, OpImpl<T>>))
-  T *rename(Op *other, const std::vector<const Type*> &types) {
-    setBefore(other);
-    T *t = create<T>(types)->with(other->operands);
+    T *t = create<T>(other->getResultTypes())->with(other->operands);
     replaceImpl(t, other);
     return t;
   }

@@ -52,10 +52,19 @@ static Type *convert(ast::Type *type) {
 }
 
 CodeGen::CodeGen(): module(builder.createModule()) {
-  builder.setToStart(module->createFirstBlock());
+  auto bb = module->createFirstBlock();
+  builder.setToStart(bb);
   auto init = builder.create<FuncOp>(unit);
+  
+  // Create a dummy init function that has only a return instruction.
   table[init->name = constructor] = init->ret();
-  init->createFirstBlock();
+  auto initbb = init->createFirstBlock();
+  builder.setToStart(initbb);
+  builder.create<ReturnOp>();
+
+  // Point the builder to the end of the module,
+  // where new functions will be generated.
+  builder.setToEnd(bb);
 }
 
 ModuleOp *CodeGen::emitModule(ASTNode *node) {
@@ -206,13 +215,18 @@ void CodeGen::emitStmt(ASTNode *node) {
     Guard guard(this);
     Builder::Guard _(builder);
     
-    builder.setToStart(func->createFirstBlock());
+    auto bb = func->createFirstBlock();
+    builder.setToStart(bb);
     for (const auto &[i, name] : data::enumerate(fn->args)) {
       auto alloca = builder.create<AllocaOp>(Type::pointer(types[i + 1]));
       table[name] = alloca->ret();
       builder.create<StoreOp>()->with(alloca->ret(), func->getArg(i));
     }
     emitStmt(fn->body);
+    if (bb->getNumOps() == 0 || !isa<ReturnOp>(bb->getLastOp())) {
+      builder.setToEnd(bb);
+      builder.create<ReturnOp>();
+    }
     return;
   }
 

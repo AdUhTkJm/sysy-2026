@@ -82,6 +82,9 @@ public:
 
 #define mark_changed \
   __changed = true
+
+#define for_all(Ty, x) \
+  for (auto op : collectOps<Ty>(x))
 }
 
 #endif
