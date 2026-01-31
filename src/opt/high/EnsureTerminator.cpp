@@ -29,7 +29,7 @@ declare_pass(EnsureTerminator) {
     eraseRedundant(op);
   
   auto loops = collectOps<WhileOp>();
-  for (auto op : ifs)
+  for (auto op : loops)
     eraseRedundant(op);
 }
 

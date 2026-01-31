@@ -38,6 +38,10 @@ if [[ ! -d $build ]]; then
 fi
 cd build
 make -j$(nproc)
+ret=$?
+if [[ $ret -ne 0 ]]; then
+  die "compile error: make returned $ret"
+fi
 cd ..
 
 if [[ -n $testcase ]]; then

@@ -24,7 +24,7 @@ protected:
   template<class T>
   std::vector<T*> collectOps() { return collectOps<T>(module); }
 
-  template<class F> __requires((requires (const F &f, ir::Op *op) { f(op); }))
+  template<class F> __requires((std::invocable<F, ir::Op*>))
   void walk(ir::Op *parent, const F &f) {
     f(parent);
     for (auto r : parent->getRegions()) {
@@ -76,6 +76,12 @@ public:
 
 #define add_pass(Ty) \
   pm.addPass(opt::make##Ty(pm.module))
+
+#define fixed(...) \
+  { bool __changed; do { __changed = false; __VA_ARGS__ } while (__changed); }
+
+#define mark_changed \
+  __changed = true
 }
 
 #endif

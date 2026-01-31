@@ -8,7 +8,6 @@ declare_local_pass(Mem2Reg,
   std::map<Value*, Value*> valmap;
   std::vector<Op*> toremove;
 ) {
-  std::cout << func << "\n";
   for (auto bb : *func->getRegion()) {
     for (auto op : *bb)
       recurse(op);
@@ -16,7 +15,6 @@ declare_local_pass(Mem2Reg,
   for (auto x : toremove)
     x->erase();
   toremove.clear();
-  std::cout << "done\n";
 }
 
 bool Mem2Reg::isLiftable(Value *value) {
@@ -107,8 +105,54 @@ void Mem2Reg::recurse(Op *op) {
     return;
   }
 
+  // A do-while op will have its arguments as the initial arguments, and its results
+  // both as loop variables and as final returned value.
   if (isa<DoWhileOp>(op)) {
-    // For a do-while op, every store will become the block-argument.
+    auto before = valmap;
+    // All stores in the op might result in a dependency.
+    auto stores = collectOps<StoreOp>(op);
+    std::set<Value*> addrs;
+    for (auto x : stores) {
+      auto addr = x->val(0);
+      if (!isLiftable(addr))
+        continue;
+      addrs.insert(addr);
+    }
+
+    auto r = op->getRegion();
+    auto cond = cast<ConditionOp>(r->getLastOp());
+    decltype(valmap) loopret;
+    for (auto x : addrs) {
+      auto it = before.find(x);
+      Value *v;
+      if (it == before.end()) {
+        Builder builder(op);
+        v = builder.create<UndefOp>(x->type->pointee())->ret();
+      } else
+        v = it->second;
+      op->pushOperand(v);
+      auto ret = op->pushResult(v->type);
+      valmap[x] = loopret[x] = ret;
+    }
+
+    for (auto bb : *r) {
+      for (auto op : *bb)
+        recurse(op);
+    }
+
+    for (auto x : addrs) {
+      auto it = valmap.find(x);
+      Value *v;
+      if (it == before.end()) {
+        Builder builder(op);
+        v = builder.create<UndefOp>(x->type->pointee())->ret();
+      } else
+        v = it->second;
+      cond->pushOperand(v);
+      // Restore valmap such that later operations refer to the loop result.
+      valmap[x] = loopret[x];
+    }
+    return;
   }
 }
 

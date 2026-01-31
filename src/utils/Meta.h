@@ -42,6 +42,32 @@ std::ostream &operator<<(std::ostream &os, const const_str<N> &str) {
   return os << str.data;
 }
 
+template<class F>
+struct InfixFunction {
+  F f;
+};
+
+template<class T, class F>
+struct InfixProxy {
+  F f;
+  T lhs;
+};
+
+template<class T, class F>
+auto operator<(T &&lhs, InfixFunction<F> op) {
+  return InfixProxy<T, F>{ std::forward<T>(lhs), op.f };
+}
+
+template<class T, class F, class U>
+decltype(auto) operator>(InfixProxy<T, F> &&proxy, U &&rhs) {
+  return proxy.f(std::forward<U>(proxy.lhs), std::forward<U>(rhs));
+}
+
+template<class F>
+constexpr auto infix(F &&f) {
+  return InfixFunction<std::decay_t<F>>{ std::forward<F>(f) };
+}
+
 }
 
 #if __cplusplus >= 202002L

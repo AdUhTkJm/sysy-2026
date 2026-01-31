@@ -7,6 +7,7 @@
 #include "../ir/Printer.h"
 
 #include "../opt/high/Passes.h"
+#include "../opt/mid/Passes.h"
 
 #include <fstream>
 #include <sstream>
@@ -17,6 +18,7 @@ Options opts;
 void populate(opt::PassManager &pm) {
   add_pass(EnsureTerminator);
   add_pass(Mem2Reg);
+  add_pass(Flatten);
 }
 
 int main(int argc, char **argv) {

@@ -15,8 +15,15 @@ class Builder {
   void insert(Op *op);
 
   template <class T, class... Types, std::size_t... Is>
-  void emplace_results_impl([[gnu::unused]] T* t, std::index_sequence<Is...>, Types&&... types) {
+  void emplaceResultsImpl([[gnu::unused]] T* t, std::index_sequence<Is...>, Types&&... types) {
     (t->results.push_back(new Value(std::forward<Types>(types), t, Is)), ...);
+  }
+
+  void replaceImpl(Op *t, Op *other) {
+    assert(t->getNumResults() == other->getNumResults());
+    for (auto [i, result] : data::enumerate(other->getResults()))
+      result->replaceAllUsesWith(t->ret(i));
+    other->erase();
   }
 public:
   class Guard {
@@ -38,14 +45,13 @@ public:
   void setToStart(Region *region) { setToStart(region->getFirstBlock()); }
   void setToEnd(Region *region) { setToEnd(region->getLastBlock()); }
 
-
   template<class T, class ...Types> __requires(
     (std::derived_from<T, OpImpl<T>> &&
     (std::derived_from<std::remove_pointer_t<Types>, Type> && ...))
   )
   T *create(Types ...types) {
     T *t = new T(bb, at);
-    emplace_results_impl(t, std::index_sequence_for<Types...>{}, std::forward<Types>(types)...);
+    emplaceResultsImpl(t, std::index_sequence_for<Types...>{}, std::forward<Types>(types)...);
     insert(t);
     return t;
   }
@@ -55,6 +61,42 @@ public:
     for (auto [i, ty] : data::enumerate(types))
       t->results.push_back(new Value(ty, t, i));
     insert(t);
+    return t;
+  }
+
+  template<class T, class ...Types> __requires(
+    (std::derived_from<T, OpImpl<T>> &&
+    (std::derived_from<std::remove_pointer_t<Types>, Type> && ...))
+  )
+  T *replace(Op *other, Types ...types) {
+    setBefore(other);
+    T *t = create<T>(std::forward<Types>(types)...);
+    replaceImpl(t, other);
+    return t;
+  }
+  template<class T> __requires((std::derived_from<T, OpImpl<T>>))
+  T *replace(Op *other, const std::vector<const Type*> &types) {
+    setBefore(other);
+    T *t = create<T>(types);
+    replaceImpl(t, other);
+    return t;
+  }
+
+  template<class T, class ...Types> __requires(
+    (std::derived_from<T, OpImpl<T>> &&
+    (std::derived_from<std::remove_pointer_t<Types>, Type> && ...))
+  )
+  T *rename(Op *other, Types ...types) {
+    setBefore(other);
+    T *t = create<T>(std::forward<Types>(types)...)->with(other->operands);
+    replaceImpl(t, other);
+    return t;
+  }
+  template<class T> __requires((std::derived_from<T, OpImpl<T>>))
+  T *rename(Op *other, const std::vector<const Type*> &types) {
+    setBefore(other);
+    T *t = create<T>(types)->with(other->operands);
+    replaceImpl(t, other);
     return t;
   }
 

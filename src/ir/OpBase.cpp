@@ -220,7 +220,15 @@ void Value::replaceAllUsesWith(Value *other) {
 
 bool Op::inside(Op *op) const {
   for (const Op *runner = this; !isa<ModuleOp>(runner); runner = runner->getParentOp()) {
-    if (op == runner)
+    if (runner == op)
+      return true;
+  }
+  return false;
+}
+
+bool Op::inside(Block *block) const {
+  for (const Op *runner = this; !isa<ModuleOp>(runner); runner = runner->getParentOp()) {
+    if (runner->parent == block)
       return true;
   }
   return false;
@@ -295,6 +303,19 @@ bool Block::dominatedBy(const Block *bb) const {
       return true;
   }
   return false;
+}
+
+Block::~Block() {
+  for (auto v : args) {
+    assert(!v->uses.size());
+    delete v;
+  }
+}
+
+Value *Block::pushArgument(const Type *type) {
+  auto value = new Value(type, this, args.size());
+  args.push_back(value);
+  return value;
 }
 
 Block *Region::insert(Block *at) {

@@ -150,7 +150,7 @@ format(ConditionOp, "condition($x0); $x>1");
 format(I2FOp, "$r0 = (f32) $x0");
 format(F2IOp, "$r0 = (i32) $x0");
 format(UndefOp, "$r0 = undef $tr0");
-format(DoWhileOp, "$r>0 = do-while");
+format(DoWhileOp, "$r>0 = do-while $x>0");
 
 printer(ExternCallOp) {
   auto extc = cast<ExternCallOp>(op);
@@ -209,16 +209,17 @@ printer(FloatOp) {
 printer(JumpOp) {
   auto jmp = cast<JumpOp>(op);
   os << "=> bb" << printer->id(jmp->target);
-  if (jmp->getNumResults() > 0) {
-    os << " with ";
+  if (jmp->getNumOperands() > 0) {
+    os << "(";
     printer->printOperands(jmp);
+    os << ")";
   }
 }
 
 printer(BranchOp) {
   auto br = cast<BranchOp>(op);
-  os << "=> " << printer->id(op->val(0)) << " ? bb" << printer->id(br->target) << " : bb" << printer->id(br->other);
-  if (br->getNumResults() > 0) {
+  os << "=> %" << printer->id(op->val(0)) << " ? bb" << printer->id(br->target) << " : bb" << printer->id(br->other);
+  if (br->getNumOperands() > 1) {
     os << " with ";
     printer->printOperands(br, 1);
   }
@@ -298,10 +299,18 @@ void Printer::indent() {
 }
 
 void Printer::printImpl(const Block *bb, bool tag) {
-  if (tag) {
+  auto numArgs = bb->getNumArgs();
+  if (tag || numArgs != 0) {
     depth--;
     indent();
-    os << "bb" << id(bb) << ":\n";
+    os << "bb" << id(bb);
+    if (numArgs > 0) {
+      os << "(%" << id(bb->arg(0));
+      for (unsigned i = 1; i < numArgs; i++)
+        os << ", %" << id(bb->arg(i));
+      os << ")";
+    }
+    os << ":\n";
     depth++;
   }
 

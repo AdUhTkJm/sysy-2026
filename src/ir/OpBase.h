@@ -46,30 +46,7 @@ struct Type {
 
 extern Type *i32, *i64, *f32, *vi4, *vf4, *unit;
 
-class Value {
-  std::multiset<Op*> uses;
-  
-  friend class Op;
-  template<class T>
-  friend class OpImpl;
-public:
-  const Type *const type;
-  Op *const def;
-  const int index;
-
-  Value(const Type *type, Op *def, int index): type(type), def(def), index(index) {}
-
-  void replaceAllUsesWith(Value *other);
-
-  bool operator==(Value &other) const;
-
-  static Arena arena;
-  static void* operator new(size_t size) {
-    return arena.allocate(size, alignof(Value));
-  }
-  static void operator delete(void*) noexcept {}
-};
-
+class Value;
 class Op {
 protected:
   std::vector<Value*> results;
@@ -97,6 +74,7 @@ public:
   Op *nextOp() const;
   Op *prevOp() const;
   Op *getParentOp() const;
+  Block *getParentBlock() const { return parent; }
 
   Value *getResult(int i = 0) const { return results[i]; }
   const auto &getResults() const { return results; }
@@ -122,6 +100,7 @@ public:
   void removeResult(int i);
 
   bool inside(Op *op) const;
+  bool inside(Block *block) const;
 
   void moveBefore(Op *op);
   void moveAfter(Op *op);
@@ -158,11 +137,68 @@ public:
 
   template<class T, class ...Args> __requires(
     (std::derived_from<T, Attr>) &&
-    (requires(Args ...args) { T(args...); })
+    (std::is_constructible_v<T, Args...>)
   )
   void set(Args ...args) {
     set<T>(new T(args...));
   }
+};
+
+
+class Value {
+  std::multiset<Op*> uses;
+  
+  friend class Op;
+  template<class T>
+  friend class OpImpl;
+  friend class Block;
+public:
+  const Type *const type;
+  union {
+    Op *const def;
+    Block *const bb;
+  };
+  const int index;
+  const bool opResult;
+
+  Value(const Type *type, Op *def, int index): type(type), def(def), index(index), opResult(true) {}
+  Value(const Type *type, Block *bb, int index): type(type), bb(bb), index(index), opResult(false) {}
+
+  void replaceAllUsesWith(Value *other);
+  template<class F> __requires((requires(const F &f) {
+    { f(std::declval<Op*>()) } -> std::same_as<bool>;
+  }))
+  void replaceAllUsesThat(Value *other, const F &pred) {
+    for (auto it = uses.begin(); it != uses.end();) {
+      if (!pred(*it)) {
+        it++;
+        continue;
+      }
+
+      auto next = it; next++;
+      auto use = *it;
+      for (auto &operand : use->operands) {
+        if (operand != this)
+          continue;
+
+        operand = other;
+        other->uses.insert(use);
+      }
+      uses.erase(it);
+      it = next;
+    }
+  }
+
+  bool isBlockArgument() const { return !opResult; }
+  bool isOpResult() const { return opResult; }
+
+  bool operator==(Value &other) const;
+
+  static Arena arena;
+  static void* operator new(size_t size) {
+    return arena.allocate(size, alignof(Value));
+  }
+  static void operator delete(void*) noexcept {}
 };
 
 template<class T>
@@ -223,6 +259,7 @@ public:
   using iterator = OpList::iterator;
 
   Block(Region *parent, BlockList::iterator place): parent(parent), place(place) {}
+  ~Block();
 
   void insert(iterator at, Op *op);
   void insertAfter(iterator at, Op *op);
@@ -239,6 +276,13 @@ public:
 
   void remove(iterator at);
   Block *nextBlock() const;
+  Region *getParentRegion() const { return parent; }
+
+  Value *pushArgument(const Type *type);
+  Value *arg(unsigned i = 0) const { return args[i]; }
+  size_t getNumArgs() const { return args.size(); }
+  const auto &getArgs() const { return args; }
+  auto &getArgs() { return args; }
 
   bool dominatedBy(const Block *bb) const;
   bool dominates(const Block *bb) const { return bb->dominatedBy(this); }
