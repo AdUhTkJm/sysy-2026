@@ -1,4 +1,5 @@
 #include "Pass.h"
+#include "../ir/Printer.h"
 
 using namespace ir;
 

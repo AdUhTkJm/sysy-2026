@@ -51,11 +51,11 @@ public: \
   /* ARM operations */ \
   arm_branch_op_list(X) \
   arm_imm_op_list(X) \
-  X(BOp) X(BlOp)
+  X(BOp) X(BlOp) X(WriteRegOp) X(ReadRegOp)
 
 #define impure_op_list(X) \
   X(ExternCallOp) X(BranchOp) X(JumpOp) X(YieldOp) X(ConditionOp) \
-  X(StoreOp) X(AllocaOp) X(CallOp) X(GlobalArrayOp) X(GlobalOp) \
+  X(StoreOp) X(CallOp) X(GlobalArrayOp) X(GlobalOp) X(ReturnOp) \
   /* ARM operations */ \
   arm_branch_op_list(X) \
   X(BOp) X(BlOp)
@@ -86,7 +86,7 @@ public: \
 
 namespace ir {
 
-bool isPure(Op *);
+bool hasSideEffect(Op *);
 
 #define opkind(Ty) Ty,
 enum class OpKind {
@@ -172,6 +172,12 @@ op(PhiOp,
 /* ARM operations */
 op(BlOp,
   std::string name;
+);
+op(WriteRegOp,
+  int reg;
+);
+op(ReadRegOp,
+  int reg;
 );
 
 // We need to ensure that the alignment of any subclass is no more than alignment of Op.

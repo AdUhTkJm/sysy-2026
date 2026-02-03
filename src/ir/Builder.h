@@ -86,6 +86,8 @@ public:
   T *rename(Op *other) {
     setBefore(other);
     T *t = create<T>(other->getResultTypes())->with(other->operands);
+    for (auto region : other->getRegions())
+      t->regions.push_back(region);
     replaceImpl(t, other);
     return t;
   }

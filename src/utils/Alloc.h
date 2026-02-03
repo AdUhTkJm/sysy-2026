@@ -9,6 +9,7 @@ class Arena {
   constexpr static size_t chunk = 1048576;
 public:
   Arena();
+  ~Arena();
   void *allocate(size_t request, size_t align);
   void reset();
 };

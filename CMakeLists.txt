@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
+set(CMAKE_CXX_COMPILER clang++)
 project(hcc LANGUAGES CXX)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -11,5 +12,8 @@ file(GLOB_RECURSE SRC_FILES CONFIGURE_DEPENDS
 add_executable(hcc ${SRC_FILES})
 
 target_compile_options(hcc PRIVATE
-  -Wall -Wextra -Wpedantic -fno-exceptions -fno-rtti -g
+  -Wall -Wextra -Wpedantic -fno-exceptions -fno-rtti -fsanitize=undefined,address -g
+)
+target_link_options(hcc PRIVATE
+  -fsanitize=undefined,address
 )

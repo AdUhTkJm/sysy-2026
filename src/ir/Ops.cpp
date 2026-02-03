@@ -29,8 +29,8 @@ Value *PhiOp::incomingFrom(const Block *bb) const {
 }
 
 #define isa(Ty) isa<Ty>(op) ||
-bool isPure(Op *op) {
-  return !(impure_op_list(isa) true);
+bool hasSideEffect(Op *op) {
+  return (impure_op_list(isa) false);
 }
 #undef isa
 

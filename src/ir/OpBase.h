@@ -99,6 +99,7 @@ public:
 
   Value *pushResult(const Type *t);
   void removeResult(int i);
+  void clearResults();
 
   bool inside(Op *op) const;
   bool inside(Block *block) const;
@@ -161,6 +162,7 @@ public:
   };
   const int index;
   const bool opResult;
+  const auto &getUses() const { return uses; }
 
   Value(const Type *type, Op *def, int index): type(type), def(def), index(index), opResult(true) {}
   Value(const Type *type, Block *bb, int index): type(type), bb(bb), index(index), opResult(false) {}
@@ -247,13 +249,14 @@ class Block {
   std::vector<Value*> args;
 
   std::set<Block*> doms, domFront, pdoms;
-  std::set<Value*> liveIn, liveOut;
   Block *idom, *ipdom;
 
   friend class Op;
   friend class Region;
 public:
   std::set<Block*> preds, succs;
+  std::set<Value*> liveIn, liveOut;
+  
   using iterator = OpList::iterator;
 
   Block(Region *parent, BlockList::iterator place): parent(parent), place(place) {}

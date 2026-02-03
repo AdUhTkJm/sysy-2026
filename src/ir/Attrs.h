@@ -3,6 +3,7 @@
 
 #include "../utils/Meta.h"
 #include "../utils/DataStructure.h"
+#include "../utils/Alloc.h"
 
 namespace ir {
 
@@ -13,9 +14,17 @@ class Block;
   
 class Attr {
 public:
+  static Arena arena;
+  static void* operator new(size_t size) { return arena.allocate(size, alignof(Attr)); }
+  static void operator delete(void*) noexcept {}
+  static void* operator new[](size_t) = delete;
+  static void operator delete[](void*) = delete;
+
   const unsigned long id;
   Attr(unsigned long id): id(id) {}
 };
+
+inline Arena Attr::arena;
 
 template<class T>
 class AttrImpl : public Attr {

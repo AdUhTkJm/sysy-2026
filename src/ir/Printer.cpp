@@ -2,6 +2,7 @@
 #include "Ops.h"
 #include "Attrs.h"
 #include "../utils/DataStructure.h"
+#include "../opt/low/Regs.h"
 #include <cstring>
 
 namespace ir {
@@ -64,7 +65,7 @@ void printWithFormat(std::ostream &os, const Op *op, Printer *printer, const cha
 
 void Printer::printResults(const Op *op, unsigned from) {
   for (size_t i = from; i < op->getNumResults(); i++) {
-    os << '%' << id(op->ret(i));
+    os << str(op->ret(i));
     if (i != op->getNumResults() - 1)
       os << ", ";
   }
@@ -72,7 +73,7 @@ void Printer::printResults(const Op *op, unsigned from) {
 
 void Printer::printOperands(const Op *op,  unsigned from) {
   for (size_t i = from; i < op->getNumOperands(); i++) {
-    os << '%' << id(op->val(i));
+    os << str(op->val(i));
     if (i != op->getNumOperands() - 1)
       os << ", ";
   }
@@ -295,6 +296,16 @@ printer(PhiOp) {
   os << "phi ";
   for (auto [value, block] : *phi)
     os << "[ " << printer->str(value) << ", " << printer->str(block) << " ] ";
+}
+
+printer(WriteRegOp) {
+  auto wr = cast<WriteRegOp>(op);
+  os << "mov " << opt::regname(wr->reg) << ", " << printer->str(wr->val());
+}
+
+printer(ReadRegOp) {
+  auto wr = cast<ReadRegOp>(op);
+  os << "mov " << printer->str(wr->ret()) << ", " << opt::regname(wr->reg);
 }
 
 attr_printer(IntAttr) {

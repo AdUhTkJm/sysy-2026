@@ -45,10 +45,7 @@ Block *Block::nextBlock() const {
 }
 
 Op::~Op() {
-  for (auto x : results) {
-    assert(x->uses.empty());
-    delete x;
-  }
+  clearResults();
 }
 
 Op *Op::prevOp() const {
@@ -132,6 +129,13 @@ void Op::clearOperands() {
   for (auto value : operands)
     value->uses.erase(this);
   operands.clear();
+}
+
+void Op::clearResults() {
+  for (auto x : results) {
+    assert(x->uses.empty());
+    delete x;
+  }
 }
 
 void Op::clearAttributes() {
@@ -778,7 +782,6 @@ void Region::convertToPhi() {
     builder.setToStart(bb);
     for (auto [i, arg] : data::enumerate(bb->getArgs())) {
       auto phi = builder.create<PhiOp>(arg->type);
-      std::cout << "pred count: " << bb->preds.size() << "\n";
       for (auto p : bb->preds) {
         auto last = p->getLastOp();
         phi->addIncoming(last->val(i), p);

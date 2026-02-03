@@ -4,7 +4,6 @@
 #include "../parse/Sema.h"
 
 #include "../ir/CodeGen.h"
-#include "../ir/Printer.h"
 
 #include "../opt/high/Passes.h"
 #include "../opt/mid/Passes.h"
@@ -27,6 +26,7 @@ void populate(opt::PassManager &pm) {
 
   // Low-IR passes.
   add_pass(Lower);
+  add_pass(RegAlloc);
 }
 
 int main(int argc, char **argv) {
@@ -52,10 +52,10 @@ int main(int argc, char **argv) {
 
   ir::CodeGen cg;
   auto module = cg.emitModule(node);
+  delete node;
 
   opt::PassManager pm(module, opts);
   populate(pm);
   pm.run();
-  std::cout << module << "\n";
   return 0;
 }

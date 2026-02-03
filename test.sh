@@ -27,6 +27,18 @@ while [[ $# -gt 0 ]] do
     shift $v;;
   -g|--gdb)
     gdb=1; shift;;
+  -p|--print-before)
+    if [[ $# -lt 2 ]]; then
+      die "expected test case name"
+    fi
+    printbefore="$2"
+    shift 2;;
+  -q|--print-after)
+    if [[ $# -lt 2 ]]; then
+      die "expected test case name"
+    fi
+    printafter="$2"
+    shift 2;;
   *)
     die "unknown name: $1";;
   esac
@@ -58,11 +70,17 @@ if [[ -n $testcase ]]; then
     die "ambiguous name: $testcase"
   fi
   echo "running: $name"
+  cmd="build/hcc $name"
   if [[ -n $gdb ]]; then
-    gdb --args build/hcc $name
-  else
-    build/hcc $name
+    cmd="gdb --args $cmd"
   fi
+  if [[ -n $printbefore ]]; then
+    cmd="$cmd --print-before $printbefore"
+  fi
+  if [[ -n $printafter ]]; then
+    cmd="$cmd --print-after $printafter"
+  fi
+  eval "ASAN_OPTIONS=detect_leaks=0 $cmd"
   ret=$?
   if [[ $ret -ne 0 ]]; then
     die "hcc error: returned $ret"

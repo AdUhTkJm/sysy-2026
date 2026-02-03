@@ -71,9 +71,9 @@ constexpr auto infix(F &&f) {
 }
 
 #if __cplusplus >= 202002L
-# define __requires(x) requires(x)
+# define __requires(...) requires(__VA_ARGS__)
 #else
-# define __requires(x)
+# define __requires(...)
 #endif
 
 #endif

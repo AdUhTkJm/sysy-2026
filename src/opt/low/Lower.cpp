@@ -54,6 +54,19 @@ void Lower::runImpl(FuncOp *func) {
     cbz->target = target;
     cbz->other = other;
   }
+
+  // Lower function arguments as reads to physical registers.
+  builder.setToStart(func->getRegion());
+  for (auto [i, arg] : data::enumerate(func->getResults())) {
+    if (i == 0)
+      continue;
+    auto rd = builder.create<ReadRegOp>(arg->type);
+    rd->reg = regbank(arg->type) == INT ? argRegs[i] : fargRegs[i];
+    arg->replaceAllUsesWith(rd->ret());
+  }
+  for (unsigned i = func->getNumResults() - 1; i > 0; i--)
+    func->removeResult(i);
+
   func->getRegion()->convertToPhi();
 };
 

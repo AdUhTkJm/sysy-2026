@@ -6,7 +6,49 @@
 
 namespace opt {
 
+class Preorder {};
+class Postorder {};
+
+#if __cplusplus >= 202002L
+template<class T>
+concept walk_order = std::same_as<T, Preorder> || std::same_as<T, Postorder>;
+#endif
+
 class Pass {
+protected:
+private:
+  template<class F>
+  void walkImpl(ir::Op *parent, const F &f, Preorder) {
+    f(parent);
+    for (auto r : parent->getRegions()) {
+      for (auto bb : *r) {
+        for (auto it = bb->begin(); it != bb->end();) {
+          auto next = it; next++;
+          walk(*it, f);
+          it = next;
+        }
+      }
+    }
+  }
+
+  template<class F>
+  void walkImpl(ir::Op *parent, const F &f, Postorder) {
+    for (auto r : parent->getRegions()) {
+      for (auto bb : *r) {
+        for (auto it = bb->begin(); it != bb->end();) {
+          auto next = it; next++;
+          walk(*it, f);
+          it = next;
+        }
+      }
+    }
+    f(parent);
+  }
+
+  template<class T, class F> __requires(walk_order<T>)
+  void walkImpl(ir::Op *parent, const F &f) {
+    walkImpl(parent, f, T{});
+  }
 protected:
   ir::ModuleOp *const module;
   std::vector<ir::FuncOp*> collectFunctions();
@@ -24,15 +66,9 @@ protected:
   template<class T>
   std::vector<T*> collectOps() { return collectOps<T>(module); }
 
-  template<class F> __requires((std::invocable<F, ir::Op*>))
+  template<class T = Preorder, class F> __requires((std::invocable<F, ir::Op*>) && walk_order<T>)
   void walk(ir::Op *parent, const F &f) {
-    f(parent);
-    for (auto r : parent->getRegions()) {
-      for (auto bb : *r) {
-        for (auto op : *bb)
-          walk(op, f);
-      }
-    }
+    walkImpl<T>(parent, f);
   }
 public:
   virtual void run() = 0;

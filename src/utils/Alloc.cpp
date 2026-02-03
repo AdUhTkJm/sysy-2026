@@ -6,6 +6,10 @@ Arena::Arena(): buf(new char[chunk]), head(buf), used(sizeof(char*)) {
   *(char **) buf = 0;
 }
 
+Arena::~Arena() {
+  reset();
+}
+
 void *Arena::allocate(size_t request, size_t align) {
   assert(request + sizeof(char *) < chunk);
   used = (used + align - 1) & ~(align - 1);
