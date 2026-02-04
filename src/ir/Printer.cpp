@@ -3,6 +3,7 @@
 #include "Attrs.h"
 #include "../utils/DataStructure.h"
 #include "../opt/low/Regs.h"
+#include "../main/Options.h"
 #include <cstring>
 
 namespace ir {
@@ -71,7 +72,7 @@ void Printer::printResults(const Op *op, unsigned from) {
   }
 }
 
-void Printer::printOperands(const Op *op,  unsigned from) {
+void Printer::printOperands(const Op *op, unsigned from) {
   for (size_t i = from; i < op->getNumOperands(); i++) {
     os << str(op->val(i));
     if (i != op->getNumOperands() - 1)
@@ -79,7 +80,7 @@ void Printer::printOperands(const Op *op,  unsigned from) {
   }
 }
 
-void Printer::printType(const Type *type) {
+void Printer::printTypeTo(const Type *type, std::ostream &os) {
   switch (type->kind) {
   case Type::i32:
     os << "i32";
@@ -100,21 +101,25 @@ void Printer::printType(const Type *type) {
     os << "unit";
     break;
   case Type::ptr:
-    printType(type->pointee());
+    printTypeTo(type->pointee(), os);
     os << "*";
     break;
   case Type::fn: {
     os << "(";
     const auto &args = type->argTypes();
     for (auto [i, x] : data::enumerate(args)) {
-      printType(x);
+      printTypeTo(x, os);
       if (i != args.size())
         os << ", ";
     }
     os << ")";
-    printType(type->retType());
+    printTypeTo(type->retType(), os);
   }
   }
+}
+
+void Printer::printType(const Type *type) {
+  printTypeTo(type, os);
 }
 
 #define printer(Ty) void print##Ty(std::ostream &os, const Op *op, Printer *printer)
@@ -171,6 +176,7 @@ format(CmpEqOp, "cmp.eq $r0, $x0, $x1");
 format(CmpNeOp, "cmp.ne $r0, $x0, $x1");
 format(CmpLtOp, "cmp.lt $r0, $x0, $x1");
 format(CmpLeOp, "cmp.le $r0, $x0, $x1");
+format(RetOp, "ret");
 
 printer(AddWIOp) {
   auto addwi = cast<AddWIOp>(op);
@@ -179,12 +185,46 @@ printer(AddWIOp) {
 
 printer(AddXIOp) {
   auto addwi = cast<AddWIOp>(op);
-  os << "add " << printer->str(op->ret(), 1) << ", " << printer->str(op->val(), 1) << ", #" << addwi->value;
+  os << "add " << printer->str(op->ret()) << ", " << printer->str(op->val()) << ", #" << addwi->value;
 }
 
 printer(MovIOp) {
   auto movi = cast<MovIOp>(op);
   os << "mov " << printer->str(op->ret()) << ", #" << movi->value;
+}
+
+printer(LdrOp) {
+  auto ldr = cast<LdrOp>(op);
+  os << "ldr " << printer->str(op->ret()) << ", [" << printer->str(op->val()) << ", #" << ldr->value << "]";
+}
+
+printer(StrOp) {
+  auto str = cast<StrOp>(op);
+  os << "str " << printer->str(op->val(1)) << ", [" << printer->str(op->val(0)) << ", #" << str->value << "]";
+}
+
+printer(LdpOp) {
+  auto ldr = cast<LdpOp>(op);
+  os << "ldp ";
+  printer->printResults(ldr);
+  os << ", [" << printer->str(op->val()) << ", #" << ldr->value << "]";
+}
+
+printer(StpOp) {
+  auto str = cast<StpOp>(op);
+  os << "stp ";
+  printer->printOperands(op, 1);
+  os << ", [" << printer->str(op->val(0)) << ", #" << str->value << "]";
+}
+
+printer(AdrpOp) {
+  auto adrp = cast<AdrpOp>(op);
+  os << "adrp " << printer->str(op->ret()) << ", " << adrp->name;
+}
+
+printer(AddXPOp) {
+  auto addxp = cast<AddXPOp>(op);
+  os << "add " << printer->str(op->ret()) << ", " << printer->str(op->val()) << ", :lo12:" << addxp->name;
 }
 
 printer(BOp) {
@@ -300,12 +340,20 @@ printer(PhiOp) {
 
 printer(WriteRegOp) {
   auto wr = cast<WriteRegOp>(op);
-  os << "mov " << opt::regname(wr->reg) << ", " << printer->str(wr->val());
+  auto val = wr->val();
+  std::string name = opt::regname(wr->reg);
+  if (val->type == i32)
+    name[0] = 'w';
+  os << "mov " << name << ", " << printer->str(val);
 }
 
 printer(ReadRegOp) {
   auto wr = cast<ReadRegOp>(op);
-  os << "mov " << printer->str(wr->ret()) << ", " << opt::regname(wr->reg);
+  auto ret = wr->ret();
+  std::string name = opt::regname(wr->reg);
+  if (ret->type == i32)
+    name[0] = 'w';
+  os << "mov " << printer->str(ret) << ", " << name;
 }
 
 attr_printer(IntAttr) {
@@ -344,6 +392,11 @@ attr_printer(ConstFArrAttr) {
   os << ">"; 
 }
 
+attr_printer(ImpureAttr) {
+  (void) attr;
+  os << "<impure>";
+}
+
 #define op_map_entry(Ty) { Ty::id, print##Ty },
 #define attr_map_entry(Ty) { Ty::identifier(), print##Ty },
 
@@ -370,18 +423,18 @@ int Printer::id(const Value *value) {
   return it == valueid.end() ? valueid[value] = vid++ : it->second;
 }
 
-std::string Printer::str(const Value *value, bool isWide) {
+std::string Printer::str(const Value *value) {
   auto it = idents.find(value);
-  if (it == idents.end())
-    return "%" + std::to_string(id(value));
-  
-  if (!isWide)
-    return it->second;
+  std::string name = (it == idents.end()) ? "%" + std::to_string(id(value)) : it->second;
+  if (options.printType) {
+    std::stringstream ss;
+    ss << "(" << name << ": ";
+    printTypeTo(value->type, ss);
+    ss << ")";
+    return ss.str();
+  }
 
-  auto v = it->second;
-  if (v[0] == 'w')
-    v[0] = 'x';
-  return v;
+  return name;
 }
 
 std::string Printer::str(const Block *block) {

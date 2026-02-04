@@ -4,11 +4,12 @@
 #include "../utils/Meta.h"
 #include "../utils/DataStructure.h"
 #include "../utils/Alloc.h"
+#include <numeric>
 
 namespace ir {
 
 #define attr_list(X) \
-  X(IntAttr) X(SizeAttr) X(DimAttr) X(ConstIArrAttr) X(ConstFArrAttr)
+  X(IntAttr) X(SizeAttr) X(DimAttr) X(ConstIArrAttr) X(ConstFArrAttr) X(ImpureAttr)
 
 class Block;
   
@@ -57,6 +58,10 @@ class DimAttr : public AttrImpl<DimAttr> {
 public:
   std::vector<int> dims;
   DimAttr(const std::vector<int> &dims): dims(dims) {}
+
+  int size() const {
+    return std::accumulate(dims.begin(), dims.end(), 1, [](int v, int x) { return v * x; });
+  }
 };
 
 class ConstIArrAttr : public AttrImpl<ConstIArrAttr> {
@@ -90,6 +95,9 @@ public:
 
   bool allZeroes() const { return zeroSuffix == value.size(); }
 };
+
+// Empty.
+class ImpureAttr : public AttrImpl<ImpureAttr> {};
 
 using Attributes = std::vector<const Attr*>;
 

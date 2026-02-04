@@ -7,6 +7,11 @@ die() {
 warn() {
   echo -e "\e[33mwarning:\e[0m $1"
 }
+check() {
+  if [[ $1 -ne 0 ]]; then
+    die "$2 error: returned $1"
+  fi
+}
 
 while [[ $# -gt 0 ]] do
   case "$1" in
@@ -25,6 +30,18 @@ while [[ $# -gt 0 ]] do
     *) testcase=$2; v=2;;
     esac
     shift $v;;
+  -x|--execute)
+    if [[ -z $output ]]; then
+      output=temp/a.s
+    fi
+    exec=1
+    shift;;
+  -o|--output)
+    if [[ $# -lt 2 ]]; then
+      die "expected output path"
+    fi
+    output=$2
+    shift 2;;
   -g|--gdb)
     gdb=1; shift;;
   -p|--print-before)
@@ -39,6 +56,9 @@ while [[ $# -gt 0 ]] do
     fi
     printafter="$2"
     shift 2;;
+  --pt|--print-type)
+    printtype=1
+    shift ;;
   *)
     die "unknown name: $1";;
   esac
@@ -80,9 +100,18 @@ if [[ -n $testcase ]]; then
   if [[ -n $printafter ]]; then
     cmd="$cmd --print-after $printafter"
   fi
+  if [[ -n $printtype ]]; then
+    cmd="$cmd --print-type"
+  fi
+  if [[ -n $output ]]; then
+    cmd="$cmd -o $output"
+  fi
   eval "ASAN_OPTIONS=detect_leaks=0 $cmd"
-  ret=$?
-  if [[ $ret -ne 0 ]]; then
-    die "hcc error: returned $ret"
+  check $? "hcc"
+  if [[ -n $exec ]]; then
+    aarch64-linux-gnu-gcc -x assembler $output -o temp/a.out -static
+    check $? "gnu \`as\`"
+    qemu-aarch64-static temp/a.out
+    # rm -f temp/a.out
   fi
 fi

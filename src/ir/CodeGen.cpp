@@ -31,12 +31,12 @@ static Type *convert(ast::Type *type) {
     return unit;
 
   if (auto p = dyn_cast<PointerType>(type))
-    return new Type(Type::ptr, { convert(p->pointee) });
+    return Type::pointer(convert(p->pointee));
   
   // The dimension of array is not important. We will generate this
   // on array access.
   if (auto arr = dyn_cast<ArrayType>(type))
-    return new Type(Type::ptr, { convert(arr->base) });
+    return Type::pointer(convert(arr->base));
 
   if (auto fnTy = dyn_cast<FunctionType>(type)) {
     Types args;
@@ -54,7 +54,7 @@ static Type *convert(ast::Type *type) {
 CodeGen::CodeGen(): module(builder.createModule()) {
   auto bb = module->createFirstBlock();
   builder.setToStart(bb);
-  auto init = builder.create<FuncOp>(unit);
+  auto init = builder.create<FuncOp>(Type::function(unit, {}));
   
   // Create a dummy init function that has only a return instruction.
   table[init->name = constructor] = init->ret();
@@ -65,6 +65,13 @@ CodeGen::CodeGen(): module(builder.createModule()) {
   // Point the builder to the end of the module,
   // where new functions will be generated.
   builder.setToEnd(bb);
+}
+
+Value *CodeGen::getGlobal(const std::string &str) {
+  assert(globals.count(str));
+  auto ptr = globals[str];
+  auto get = builder.create<GetGlobalOp>(Type::pointer(ptr->type))->with(ptr);
+  return get->ret();
 }
 
 ModuleOp *CodeGen::emitModule(ASTNode *node) {
@@ -82,11 +89,10 @@ Value *CodeGen::emitExpr(ASTNode *node) {
 
   if (auto ref = dyn_cast<VarRefNode>(node)) {
     Value *addr;
-    if (!table.count(ref->name)) {
-      assert(globals.count(ref->name));
-      auto glob = globals[ref->name];
-      addr = builder.create<GetGlobalOp>(Type::pointer(glob->type))->with(glob)->ret();
-    } else addr = table[ref->name];
+    if (!table.count(ref->name))
+      addr = getGlobal(ref->name);
+    else
+      addr = table[ref->name];
     return builder.create<LoadOp>(addr->type->pointee())->with(addr)->ret();
   }
 
@@ -171,7 +177,7 @@ Value *CodeGen::emitExpr(ASTNode *node) {
   if (auto access = dyn_cast<ArrayAccessNode>(node)) {
     Value *array;
     if (auto it = table.find(access->array); it == table.end())
-      assert(globals.count(access->array)), array = globals[access->array];
+      array = getGlobal(access->array);
     else
       array = it->second;
     Values vals { array };
@@ -370,7 +376,7 @@ void CodeGen::emitStmt(ASTNode *node) {
     if (auto it = table.find(name); it != table.end())
       addr = it->second;
     else
-      assert(globals.count(name)), addr = globals[name];
+      addr = getGlobal(name);
     auto value = emitExpr(assign->r);
     builder.create<StoreOp>()->with(addr, value);
     return;

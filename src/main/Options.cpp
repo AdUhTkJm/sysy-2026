@@ -68,6 +68,7 @@ Options parseArgs(int argc, char **argv) {
     PARSEOPT("--verify", verify);
     PARSEOPT("--bv", bv);
     PARSEOPT("--sat", sat);
+    PARSEOPT("--print-type", printType);
 
     if (opts.inputFile != "") {
       std::cerr << "error: multiple inputs\n";

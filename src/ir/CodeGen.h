@@ -14,6 +14,8 @@ class CodeGen {
 
   static constexpr std::string constructor = "__init";
   static const std::map<std::string, Type *> external;
+
+  Value *getGlobal(const std::string &name);
 public:
   class Guard {
     CodeGen *cg;

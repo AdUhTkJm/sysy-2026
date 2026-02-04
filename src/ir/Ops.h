@@ -22,6 +22,7 @@ public: \
   X(AddWOp) X(AddXOp) \
   X(SubWOp) X(SubXOp) X(MulWOp) X(MulXOp) \
   X(DivWOp) X(DivXOp) X(CmpEqOp) X(CmpNeOp) X(CmpLtOp) X(CmpLeOp) \
+  X(RetOp)
 
 #define arm_branch_op_list(X) \
   X(BeqOp) X(BneOp) X(BltOp) X(BleOp) X(CbzOp) X(CbnzOp)
@@ -38,7 +39,7 @@ public: \
   X(JumpOp)
 
 #define arm_imm_op_list(X) \
-  X(AddWIOp) X(AddXIOp) X(MovIOp)
+  X(AddWIOp) X(AddXIOp) X(MovIOp) X(LdrOp) X(StrOp) X(LdpOp) X(StpOp) 
 
 #define imm_op_list(X) \
   arm_imm_op_list(X) \
@@ -51,14 +52,14 @@ public: \
   /* ARM operations */ \
   arm_branch_op_list(X) \
   arm_imm_op_list(X) \
-  X(BOp) X(BlOp) X(WriteRegOp) X(ReadRegOp)
+  X(BOp) X(BlOp) X(WriteRegOp) X(ReadRegOp) X(AdrpOp) X(AddXPOp) \
 
 #define impure_op_list(X) \
   X(ExternCallOp) X(BranchOp) X(JumpOp) X(YieldOp) X(ConditionOp) \
   X(StoreOp) X(CallOp) X(GlobalArrayOp) X(GlobalOp) X(ReturnOp) \
   /* ARM operations */ \
   arm_branch_op_list(X) \
-  X(BOp) X(BlOp)
+  X(StrOp) X(StpOp) X(BOp) X(BlOp)
 
 #define targetful_op(Ty, ...) \
   op(Ty, \
@@ -178,6 +179,12 @@ op(WriteRegOp,
 );
 op(ReadRegOp,
   int reg;
+);
+op(AdrpOp,
+  std::string name;
+);
+op(AddXPOp,
+  std::string name;
 );
 
 // We need to ensure that the alignment of any subclass is no more than alignment of Op.

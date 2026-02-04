@@ -8,10 +8,20 @@ namespace opt {
 
 declare_pass(Lower,
   void runImpl(FuncOp *func);
+  bool hasInit = false;
+  FuncOp *main = nullptr;
 ) {
   printer.setBlockPrefix(".L");
   for (auto x : collectFunctions())
     runImpl(x);
+
+  if (hasInit) {
+    assert(main && "main function must exist");
+    Builder builder;
+    builder.setToStart(main->getRegion());
+    auto call = builder.create<BlOp>(unit);
+    call->name = "__init";
+  }
 }
 
 void Lower::runImpl(FuncOp *func) {
@@ -41,7 +51,7 @@ void Lower::runImpl(FuncOp *func) {
   for_all(ExternCallOp, func) {
     auto name = std::move(op->name);
     auto bl = builder.rename<BlOp>(op);
-    bl->name = name;
+    bl->name = std::move(name);
   }
   for_all(JumpOp, func) {
     auto target = op->target;
@@ -53,6 +63,24 @@ void Lower::runImpl(FuncOp *func) {
     auto cbz = builder.rename<CbzOp>(op);
     cbz->target = target;
     cbz->other = other;
+  }
+  for_all(LoadOp, func) {
+    auto ld = builder.rename<LdrOp>(op);
+    ld->value = 0;
+  }
+  for_all(StoreOp, func) {
+    auto ld = builder.rename<StrOp>(op);
+    ld->value = 0;
+  }
+  for_all(GetGlobalOp, func) {
+    auto global = cast<GlobalOp>(op->val(0)->def);
+    auto name = global->name;
+    builder.setBefore(op);
+    auto ty = op->ret()->type;
+    auto la = builder.create<AdrpOp>(ty);
+    la->name = name;
+    auto addx = builder.replace<AddXPOp>(op, ty)->with(la->ret());
+    addx->name = std::move(name);
   }
 
   // Lower function arguments as reads to physical registers.
@@ -66,6 +94,11 @@ void Lower::runImpl(FuncOp *func) {
   }
   for (unsigned i = func->getNumResults() - 1; i > 0; i--)
     func->removeResult(i);
+
+  if (func->name == "__init")
+    hasInit = true;
+  if (func->name == "main")
+    main = func;
 
   func->getRegion()->convertToPhi();
 };

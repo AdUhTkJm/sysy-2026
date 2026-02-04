@@ -17,6 +17,7 @@ struct Options {
   option verify : 1;
   option bv : 1;
   option sat : 1;
+  option printType : 1;
 
   std::string inputFile;
   std::string outputFile;
@@ -26,7 +27,7 @@ struct Options {
   std::string simulateInput;
   
   Options();
-};
+} extern options;
 
 Options parseArgs(int argc, char **argv);
 

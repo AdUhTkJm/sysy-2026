@@ -42,6 +42,10 @@ struct Type {
   auto argTypes() const { assert(subtypes.size() >= 1); return std::vector(subtypes.begin() + 1, subtypes.end()); }
 
   static Type *pointer(const Type *pointee) { return new Type(ptr, { pointee }); }
+  static Type *function(const Type *ret, std::vector<const Type *> subtypes) {
+    subtypes.insert(subtypes.begin(), ret);
+    return new Type(fn, subtypes);
+  }
 };
 
 extern Type *i32, *i64, *f32, *vi4, *vf4, *unit;
@@ -124,11 +128,17 @@ public:
   Value *val(unsigned i = 0) const { assert(i < operands.size()); return operands[i]; }
   Value *ret(unsigned i = 0) const { assert(i < results.size()); return results[i]; }
 
-  template<class T>
-  const T *get() {
+  template<class T> __requires((std::derived_from<T, Attr>))
+  const T *get() const {
     std::string name(T::getMnemonics());
     auto it = attrs.find(name);
     return it == attrs.end() ? nullptr : cast<T>(it->second);
+  }
+
+  template<class T> __requires((std::derived_from<T, Attr>))
+  bool has() const {
+    std::string name(T::getMnemonics());
+    return attrs.count(name);
   }
 
   template<class T> __requires((std::derived_from<T, Attr>))
@@ -143,6 +153,12 @@ public:
   )
   void set(Args ...args) {
     set<T>(new T(args...));
+  }
+
+  template<class T> __requires((std::derived_from<T, Attr>))
+  void remove() {
+    std::string name(T::getMnemonics());
+    attrs.erase(name);
   }
 };
 

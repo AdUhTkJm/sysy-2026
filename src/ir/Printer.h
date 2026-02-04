@@ -24,11 +24,12 @@ class Printer {
   static AttrPrintMap &attrDispatch();
   void indent();
   void printImpl(const Block *bb, bool tag);
+  void printTypeTo(const Type *type, std::ostream &os);
 public:
   Printer() = default;
   int id(const Block *block);
   int id(const Value *value);
-  std::string str(const Value *value, bool isWide = false);
+  std::string str(const Value *value);
   std::string str(const Block *block);
 
   void print(const Region *region);
@@ -43,6 +44,7 @@ public:
   void reset();
   void addIdent(const Value *v, const std::string &str) { idents[v] = str; }
   void setBlockPrefix(const std::string &prefix) { bbPrefix = prefix; }
+  void setIndent(int i) { depth = i; }
   
   void dump(std::ostream &os);
 } extern printer;

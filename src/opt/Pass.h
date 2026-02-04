@@ -2,7 +2,6 @@
 #define PASS_H
 
 #include "../ir/Ops.h"
-#include "../main/Options.h"
 
 namespace opt {
 
@@ -78,13 +77,12 @@ public:
 
 class PassManager {
   std::vector<Pass*> passes;
-  const Options options;
 public:
   ir::ModuleOp *const module;
   
   void run();
   void addPass(Pass *pass);
-  PassManager(ir::ModuleOp *module, const Options &options): options(options), module(module) {}
+  PassManager(ir::ModuleOp *module): module(module) {}
 };
 
 #define make_pass(Ty) Pass *make##Ty(ir::ModuleOp *module)
@@ -119,8 +117,17 @@ public:
 #define mark_changed \
   __changed = true
 
-#define for_all(Ty, x) \
-  for (auto op : collectOps<Ty>(x))
+#define for_all(Ty, ...) \
+  for (auto op : collectOps<Ty>(__VA_ARGS__))
+
+#define for_ops_in(parent, body) \
+  for (auto r : parent->getRegions()) { \
+    for (auto bb : *r) { \
+      for (auto op : *bb) \
+        body \
+    } \
+  }
+
 }
 
 #endif

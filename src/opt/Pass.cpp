@@ -1,4 +1,5 @@
 #include "Pass.h"
+#include "../main/Options.h"
 #include "../ir/Printer.h"
 
 using namespace ir;
@@ -16,12 +17,24 @@ std::vector<FuncOp*> Pass::collectFunctions() {
   return result;
 }
 
+int strcmp_nocase(const char *l, const char *r) {
+  auto p = l, q = r;
+  while (*p && *q) {
+    int diff = tolower(*p++) - tolower(*q++);
+    if (diff < 0)
+      return -1;
+    if (diff > 0)
+      return 1;
+  }
+  return *p ? 1 : *q ? -1 : 0;
+}
+
 void PassManager::run() {
   for (auto pass : passes) {
-    if (options.printBefore == pass->name())
+    if (!strcmp_nocase(options.printBefore.c_str(), pass->name()))
       std::cout << module;
     pass->run();
-    if (options.printAfter == pass->name())
+    if (!strcmp_nocase(options.printAfter.c_str(), pass->name()))
       std::cout << module;
   }
 }

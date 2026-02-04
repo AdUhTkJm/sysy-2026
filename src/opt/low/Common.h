@@ -5,3 +5,10 @@
 #include "Regs.h"              // IWYU pragma: keep
 
 using namespace ir;
+
+namespace opt {
+
+int asmSize(const Op *op);
+int asmSize(const Type *ty);
+
+}

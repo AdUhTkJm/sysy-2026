@@ -13,7 +13,7 @@
 #include <sstream>
 #include <iostream>
 
-Options opts;
+Options options;
 
 void populate(opt::PassManager &pm) {
   // High-IR passes.
@@ -26,14 +26,15 @@ void populate(opt::PassManager &pm) {
 
   // Low-IR passes.
   add_pass(Lower);
+  add_pass(LowerPostSchedule);
   add_pass(RegAlloc);
 }
 
 int main(int argc, char **argv) {
-  opts = parseArgs(argc, argv);
+  options = parseArgs(argc, argv);
 
   // Read input file.
-  std::ifstream ifs(opts.inputFile);
+  std::ifstream ifs(options.inputFile);
   if (!ifs) {
     std::cerr << "cannot open file\n";
     return 1;
@@ -54,7 +55,7 @@ int main(int argc, char **argv) {
   auto module = cg.emitModule(node);
   delete node;
 
-  opt::PassManager pm(module, opts);
+  opt::PassManager pm(module);
   populate(pm);
   pm.run();
   return 0;
