@@ -56,11 +56,11 @@ while [[ $# -gt 0 ]] do
     fi
     printafter="$2"
     shift 2;;
-  --pt|--print-type)
+  --pt|--print-type|--types)
     printtype=1
     shift ;;
   *)
-    die "unknown name: $1";;
+    die "unknown argument: $1";;
   esac
 done
 

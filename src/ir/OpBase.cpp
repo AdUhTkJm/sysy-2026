@@ -7,18 +7,20 @@
 #include <cassert>
 #include <algorithm>
 
-using namespace ir;
+namespace ir {
 
 Arena Op::arena;
 Arena Type::arena;
 Arena Value::arena;
 
-Type *ir::i32 = new Type(Type::i32);
-Type *ir::i64 = new Type(Type::i64);
-Type *ir::f32 = new Type(Type::f32);
-Type *ir::vi4 = new Type(Type::vi4);
-Type *ir::vf4 = new Type(Type::vf4);
-Type *ir::unit = new Type(Type::unit);
+Type::TypeCache Type::cache;
+
+const Type *i32 = Type::get(Type::i32, {});
+const Type *i64 = Type::get(Type::i64, {});
+const Type *f32 = Type::get(Type::f32, {});
+const Type *vi4 = Type::get(Type::vi4, {});
+const Type *vf4 = Type::get(Type::vf4, {});
+const Type *unit = Type::get(Type::unit, {});
 
 void Block::insert(iterator at, Op *op) {
   op->parent = this;
@@ -821,7 +823,7 @@ void Region::convertToBlockArguments() {
   case (int) OpKind::Ty: \
     return cast<Ty>(op)->target; \
 
-Block *ir::targetOf(Op *op) {
+Block *targetOf(Op *op) {
   switch (op->id) {
   targetful_op_list(targetof)
   branch_op_list(targetof)
@@ -834,10 +836,12 @@ Block *ir::targetOf(Op *op) {
   case (int) OpKind::Ty: \
     return cast<Ty>(op)->other; \
 
-Block *ir::elseOf(Op *op) {
+Block *elseOf(Op *op) {
   switch (op->id) {
   branch_op_list(elseof)
   default:
     return nullptr;
   }
+}
+
 }

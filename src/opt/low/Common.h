@@ -10,5 +10,8 @@ namespace opt {
 
 int asmSize(const Op *op);
 int asmSize(const Type *ty);
+ReadRegOp *createAssignedRd(Builder &builder, Reg reg);
+
+extern std::unordered_map<Value*, Reg> assignment;
 
 }

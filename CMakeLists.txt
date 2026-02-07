@@ -12,7 +12,8 @@ file(GLOB_RECURSE SRC_FILES CONFIGURE_DEPENDS
 add_executable(hcc ${SRC_FILES})
 
 target_compile_options(hcc PRIVATE
-  -Wall -Wextra -Wpedantic -fno-exceptions -fno-rtti -fsanitize=undefined,address -g
+  -Wall -Wextra -Wpedantic -Wno-gnu-anonymous-struct -Wno-nested-anon-types
+  -fno-exceptions -fno-rtti -fsanitize=undefined,address -g
 )
 target_link_options(hcc PRIVATE
   -fsanitize=undefined,address

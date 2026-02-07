@@ -1,0 +1,305 @@
+#include "Matcher.h"
+#include <cstring>
+
+namespace {
+
+// Do a strcmp without case sensitivity.
+bool compare_name(const char *name, const char *tyname, unsigned sz) {
+  for (unsigned i = 0; i < sz; i++) {
+    if (tolower(tyname[i]) != tolower(name[i]))
+      return false;
+  }
+  return true;
+}
+
+enum Kind {
+  LPar, RPar, Ident, Colon, End
+};
+
+struct Token {
+  Kind kind;
+  std::string_view text;
+};
+
+class Lexer {
+  std::string_view str;
+  unsigned loc = 0;
+public:
+  Lexer(std::string_view str): str(str) {}
+
+  Token next();
+};
+
+Token Lexer::next() {
+  while (loc < str.size() && isspace(str[loc]))
+    loc++;
+  
+  if (loc == str.size())
+    return { End, "" };
+
+  auto c = str[loc++];
+  if (c == '(')
+    return { LPar, "" };
+  if (c == ')')
+    return { RPar, "" };
+  if (c == ':')
+    return { Colon, "" };
+
+  unsigned v = --loc;
+  for (; v < str.size(); v++) {
+    if (!(isalnum(str[v]) || str[v] == '_' || str[v] == '\''))
+      break;
+  }
+  Token t { Ident, str.substr(loc, v - loc) };
+  loc = v;
+  return t;
+}
+
+using namespace ir::match;
+
+class Parser {
+  Lexer &lex;
+  Token cur;
+
+  void expect(Kind k);
+  std::string_view expectIdent();
+  void advance() { cur = lex.next(); }
+public:
+  const Pattern *parse();
+  Parser(Lexer &lex): lex(lex), cur(lex.next()) {}
+};
+
+void Parser::expect(Kind k) {
+  assert(cur.kind == k);
+  advance();
+}
+
+std::string_view Parser::expectIdent() {
+  assert(cur.kind == Ident);
+  auto text = cur.text;
+  advance();
+  return text;
+}
+
+const Pattern *Parser::parse() {
+  if (cur.kind == Ident) {
+    std::string_view name = cur.text;
+    advance();
+
+    Pattern *p = new Pattern(name[0] == '\'' ? Pattern::Imm : Pattern::Var, name);
+
+    if (cur.kind == Colon) {
+      advance();
+      auto tyname = expectIdent();
+      assert(tyname.size() < 4);
+      strncpy(p->tyname, tyname.begin(), tyname.size());
+    }
+    return p;
+  }
+
+  expect(LPar);
+  auto opname = expectIdent();
+  ir::OpKind kind = ir::opkindNames.at(std::string(opname));
+  auto pat = new Pattern(kind);
+
+  if (cur.kind == Colon) {
+    advance();
+    auto tyname = expectIdent();
+    assert(tyname.size() < 4);
+    strncpy(pat->tyname, tyname.begin(), tyname.size());
+  }
+
+  for (int i = 0; i < 3 && cur.kind != RPar; i++)
+    pat->children[i] = parse();
+
+  expect(RPar);
+  return pat;
+}
+
+}
+
+namespace ir::match {
+
+Arena Pattern::arena;
+
+void Env::refillTypes() {
+  types["i32"] = i32;
+  types["i64"] = i64;
+  types["f32"] = f32;
+  types["vi4"] = vi4;
+  types["vf4"] = vf4;
+}
+
+void Env::clear() {
+  vals.clear();
+  imms.clear();
+  types.clear();
+  refillTypes();
+}
+
+int Pattern::size() const {
+  int size;
+  for (size = 0; size < 3; size++) {
+    if (!children[size])
+      break;
+  }
+  return size;
+}
+
+const Pattern *Pattern::make(std::string_view str) {
+  Lexer lex(str);
+  Parser parser(lex);
+  return parser.parse();
+}
+
+Pattern::Pattern(decltype(kind) k, std::string_view n): kind(k) {
+  assert(n.size() < sizeof(name));
+  strncpy(name, n.begin(), n.size());
+}
+
+Pattern::Pattern(OpKind kind): kind(Op), op(kind) {
+}
+
+static bool match(Op *op, const Pattern *pattern, Env &env) {
+  auto it = adaptors.find(op->id);
+  if (it == adaptors.end())
+    return false;
+
+  return it->second.match(op, pattern, env);
+}
+
+static Op *build(Builder &builder, const Pattern *pattern, const Env &env) {
+  auto it = adaptors.find(pattern->kind);
+  if (it == adaptors.end())
+    return nullptr;
+
+  return it->second.build(builder, pattern, env);
+}
+
+template<class T>
+bool matchEmptyImpl(Op *op, const Pattern *pattern, Env &env) {
+  if (!op || op->getNumResults() != 1 || pattern->kind == Pattern::Imm)
+    return false;
+
+  auto ret = op->ret();
+  if (pattern->kind == Pattern::Var) {
+    if (auto it = env.vals.find(pattern->name); it != env.vals.end()) {
+      if (it->second->def != op)
+        return false;
+    }
+
+    env.vals[pattern->name] = ret;
+  }
+
+  if (strlen(pattern->tyname) != 0) {
+    if (auto it = env.types.find(pattern->tyname); it != env.types.end()) {
+      if (it->second != ret->type)
+        return false;
+    }
+
+    env.types[pattern->name] = ret->type;
+  }
+
+  if (op->getNumOperands() > 3)
+    return false;
+
+  auto mnemonic = OpImpl<T, (int) OpKindOf<T>::value>::mnemonic;
+  if (!compare_name(pattern->name, mnemonic, mnemonic.size))
+    return false;
+  
+  for (auto [i, pat] : data::enumerate(pattern->children)) {
+    if (pat && !match(op->getResult(i)->def, pat, env))
+      return false;
+  }
+  return true;
+}
+
+template<class T>
+Op *buildEmptyImpl(Builder &builder, const Pattern *pattern, const Env &env) {
+  if (pattern->kind == Pattern::Var)
+    return env.vals.at(pattern->name)->def;
+
+  assert(pattern->kind != Pattern::Imm);
+  Op *op;
+  if (strlen(pattern->tyname) == 0)
+    op = builder.create<T>();
+  else {
+    auto ty = env.types.at(pattern->tyname);
+    op = builder.create<T>(ty);
+  }
+  
+  for (int i = 0; i < 3; i++) {
+    auto ch = pattern->children[i];
+    if (!ch)
+      break;
+
+    op->pushOperand(build(builder, ch, env)->ret());
+  }
+  return op;
+}
+
+template<class T>
+bool matchImmImpl(Op *op, const Pattern *pattern, Env &env) {
+  Pattern pat(*pattern);
+
+  auto size = pat.size();
+  auto &last = pat.children[size - 1];
+  if (last->kind != Pattern::Imm)
+    return false;
+  
+  env.imms[last->name] = cast<T>(op)->value;
+  last = nullptr;
+  return matchEmptyImpl<T>(op, &pat, env);
+}
+
+template<class T>
+Op *buildImmImpl(Builder &builder, const Pattern *pattern, const Env &env) {
+  Pattern pat(*pattern);
+
+  auto size = pat.size();
+  auto &last = pat.children[size - 1];
+  assert(last->kind == Pattern::Imm);
+
+  auto value = env.imms.at(last->name);
+  last = nullptr;
+
+  auto op = buildEmptyImpl<T>(builder, pattern, env);
+  cast<T>(op)->value = value;
+
+  return op;
+}
+
+#define adaptor_decl(Ty, infix) { (decltype(Op::id)) OpKind::Ty, OpAdaptor { match##infix##Impl<Ty>, build##infix##Impl<Ty> } },
+#define empty_adaptor_decl(Ty) adaptor_decl(Ty, Empty)
+#define imm_adaptor_decl(Ty) adaptor_decl(Ty, Imm)
+
+Adaptors adaptors {
+  empty_op_list(empty_adaptor_decl)
+  imm_op_list(imm_adaptor_decl)
+};
+
+Op *Rule::build(Builder &builder) {
+  if (!building || !pred(env))
+    return nullptr;
+
+  return ::build(builder, building, env);
+}
+
+bool Rule::match(Op *op) {
+  return ::match(op, matching, env);
+}
+
+Op *Rule::rewrite(Op *op) {
+  env.clear();
+  if (!match(op))
+    return nullptr;
+
+  Builder builder;
+  builder.setBefore(op);
+  auto after = build(builder);
+  op->ret()->replaceAllUsesWith(after->ret());
+  op->erase();
+  return after;
+}
+
+}

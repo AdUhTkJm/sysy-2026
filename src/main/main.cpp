@@ -28,6 +28,9 @@ void populate(opt::PassManager &pm) {
   add_pass(Lower);
   add_pass(LowerPostSchedule);
   add_pass(RegAlloc);
+  add_pass(LateLegalize);
+  add_pass(InstCombine);
+  add_pass(Print);
 }
 
 int main(int argc, char **argv) {

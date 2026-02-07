@@ -34,4 +34,22 @@ bool hasSideEffect(Op *op) {
 }
 #undef isa
 
+// Takes `AddIOp` to `addi`.
+std::string stripped(const char *s) {
+  std::string v;
+  for (auto p = s; *p; p++) {
+    v.push_back(tolower(*p));
+  }
+  v.pop_back();
+  v.pop_back();
+  return v;
+}
+
+#define opkind_name_map(Ty) \
+  { stripped(#Ty), OpKind::Ty },
+
+const std::map<std::string, OpKind> opkindNames {
+  complete_op_list(opkind_name_map)
+};
+
 }

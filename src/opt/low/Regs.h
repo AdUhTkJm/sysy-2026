@@ -86,136 +86,134 @@
 
 namespace opt {
 
+constexpr int FP = 0, INT = 1;
+
 #define reg_decl(reg) reg,
 enum Reg {
+  unallocated,
   regs_list(reg_decl)
-  End
+  reg_end
 };
 
 #define reg_name(reg) #reg,
 constexpr const char *regnames[] = {
-  regs_list(reg_name)
+  "<no alloc>", regs_list(reg_name)
 };
 
 inline constexpr const char *regname(int t) {
-  if (t >= End || t < 0)
-    return "<unknown>";
+  if (t >= reg_end || t < 0)
+    return "<bad>";
   
   return regnames[t];
 }
 
 #define fp_reg(reg) case reg:
-inline bool isFP(Reg reg) {
+inline bool regbank(Reg reg) {
   switch (reg) {
   fp_reg_list(fp_reg)
-    return true;
+    return FP;
   default:
-    return false;
+    return INT;
   }
 }
 
 
 const Reg fargRegs[] = {
-  Reg::v0, Reg::v1, Reg::v2, Reg::v3,
-  Reg::v4, Reg::v5, Reg::v6, Reg::v7,
+  v0, v1, v2, v3,
+  v4, v5, v6, v7,
 };
 const Reg argRegs[] = {
-  Reg::x0, Reg::x1, Reg::x2, Reg::x3,
-  Reg::x4, Reg::x5, Reg::x6, Reg::x7,
+  x0, x1, x2, x3,
+  x4, x5, x6, x7,
 };
 
-// We use dedicated registers as the "spill" registers, for simplicity.
-const Reg spillReg = Reg::x28;
-const Reg spillReg2 = Reg::x15;
-const Reg fspillReg = Reg::v31;
-const Reg fspillReg2 = Reg::v15;
+const Reg scratch = x17;
 
 // Order for leaf functions. Prioritize temporaries.
 const Reg leafOrder[] = {
-  Reg::x0, Reg::x1, Reg::x2, Reg::x3,
-  Reg::x4, Reg::x5, Reg::x6, Reg::x7,
+  x0, x1, x2, x3,
+  x4, x5, x6, x7,
 
-  Reg::x8, Reg::x9, Reg::x10, Reg::x11,
-  Reg::x12, Reg::x13, Reg::x14,
-  Reg::x16, Reg::x17,
+  x8, x9, x10, x11,
+  x12, x13, x14, x15,
+  x16,
 
-  Reg::x19, Reg::x20, Reg::x21, Reg::x22,
-  Reg::x23, Reg::x24, Reg::x25, Reg::x26,
-  Reg::x27,
+  x19, x20, x21, x22,
+  x23, x24, x25, x26,
+  x27, x28, x29
 };
 // Order for non-leaf functions.
 const Reg normalOrder[] = {
-  Reg::x0, Reg::x1, Reg::x2, Reg::x3,
-  Reg::x4, Reg::x5, Reg::x6, Reg::x7,
+  x0, x1, x2, x3,
+  x4, x5, x6, x7,
 
-  Reg::x8, Reg::x9, Reg::x10, Reg::x11,
-  Reg::x12, Reg::x13, Reg::x14,
-  Reg::x16, Reg::x17,
+  x8, x9, x10, x11,
+  x12, x13, x14, x15,
+  x16,
 
-  Reg::x19, Reg::x20, Reg::x21, Reg::x22,
-  Reg::x23, Reg::x24, Reg::x25, Reg::x26,
-  Reg::x27,
+  x19, x20, x21, x22,
+  x23, x24, x25, x26,
+  x27, x28, x29
 };
 
 // The same, but for floating point registers.
 const Reg leafOrderf[] = {
-  Reg::v0, Reg::v1, Reg::v2, Reg::v3,
-  Reg::v4, Reg::v5, Reg::v6, Reg::v7,
+  v0, v1, v2, v3,
+  v4, v5, v6, v7,
 
-  Reg::v8, Reg::v9, Reg::v10, Reg::v11,
-  Reg::v12, Reg::v13, Reg::v14,
+  v8, v9, v10, v11,
+  v12, v13, v14, v15,
 
-  Reg::v16, Reg::v17, Reg::v18,
-  Reg::v19, Reg::v20, Reg::v21, Reg::v22,
-  Reg::v23, Reg::v24, Reg::v25, Reg::v26,
-  Reg::v27, Reg::v28, Reg::v29,
+  v16, v17, v18, v19,
+  v20, v21, v22, v23,
+  v24, v25, v26, v27,
+  v28, v29, v30, v31,
 };
 // Order for non-leaf functions.
 const Reg normalOrderf[] = {
-  Reg::v0, Reg::v1, Reg::v2, Reg::v3,
-  Reg::v4, Reg::v5, Reg::v6, Reg::v7,
+  v0, v1, v2, v3,
+  v4, v5, v6, v7,
 
-  Reg::v8, Reg::v9, Reg::v10, Reg::v11,
-  Reg::v12, Reg::v13, Reg::v14,
+  v8, v9, v10, v11,
+  v12, v13, v14, v15,
 
-  Reg::v16, Reg::v17, Reg::v18,
-  Reg::v19, Reg::v20, Reg::v21, Reg::v22,
-  Reg::v23, Reg::v24, Reg::v25, Reg::v26,
-  Reg::v27, Reg::v28, Reg::v29,
+  v16, v17, v18, v19,
+  v20, v21, v22, v23,
+  v24, v25, v26, v27,
+  v28, v29, v30, v31,
 };
 
 const std::set<Reg> callerSaved = {
-  Reg::x0, Reg::x1, Reg::x2, Reg::x3,
-  Reg::x4, Reg::x5, Reg::x6, Reg::x7,
+  x0, x1, x2, x3,
+  x4, x5, x6, x7,
 
-  Reg::x8, Reg::x9, Reg::x10, Reg::x11,
-  Reg::x12, Reg::x13, Reg::x14, Reg::x15,
-  Reg::x16, Reg::x17,
+  x8, x9, x10, x11,
+  x12, x13, x14, x15,
+  x16, x17,
 
-  Reg::v0, Reg::v1, Reg::v2, Reg::v3,
-  Reg::v4, Reg::v5, Reg::v6, Reg::v7,
+  v0, v1, v2, v3,
+  v4, v5, v6, v7,
 
-  Reg::v8, Reg::v9, Reg::v10, Reg::v11,
-  Reg::v12, Reg::v13, Reg::v14, Reg::v15,
+  v8, v9, v10, v11,
+  v12, v13, v14, v15,
 };
 
 const std::set<Reg> calleeSaved = {
-  Reg::x19, Reg::x20, Reg::x21, Reg::x22,
-  Reg::x23, Reg::x24, Reg::x25, Reg::x26,
-  Reg::x27, Reg::x28,
+  x19, x20, x21, x22,
+  x23, x24, x25, x26,
+  x27, x28, x29, x30,
 
-  Reg::v16, Reg::v17, Reg::v18,
-  Reg::v19, Reg::v20, Reg::v21, Reg::v22,
-  Reg::v23, Reg::v24, Reg::v25, Reg::v26,
-  Reg::v27, Reg::v28, Reg::v29, Reg::v30,
+  v16, v17, v18, v19,
+  v20, v21, v22, v23,
+  v24, v25, v26, v27,
+  v28, v29, v30, v31,
 };
 
-constexpr int leafRegCnt = 26;
-constexpr int leafRegCntf = 29;
-constexpr int normalRegCnt = 26;
-constexpr int normalRegCntf = 29;
+constexpr int regcnt = sizeof(leafOrder) / sizeof(leafOrder[0]);
+constexpr int regcntf = sizeof(leafOrderf) / sizeof(leafOrderf[0]);
 
-constexpr int FP = 0, INT = 1;
+static_assert(regcnt == sizeof(normalOrder) / sizeof(normalOrder[0]));
+static_assert(regcntf == sizeof(normalOrderf) / sizeof(normalOrderf[0]));
 
 inline int regbank(const ir::Type *ty) {
   if (ty == ir::f32 || ty == ir::vi4 || ty == ir::vf4)

@@ -13,7 +13,7 @@ class CodeGen {
   ModuleOp *module;
 
   static constexpr std::string constructor = "__init";
-  static const std::map<std::string, Type *> external;
+  static const std::map<std::string, const Type *> external;
 
   Value *getGlobal(const std::string &name);
 public:

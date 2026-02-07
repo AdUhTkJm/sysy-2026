@@ -8,6 +8,7 @@ namespace meta {
 
 template<int N>
 struct const_str {
+  constexpr static int size = N;
   char data[N + 1];
 
   constexpr const_str() {

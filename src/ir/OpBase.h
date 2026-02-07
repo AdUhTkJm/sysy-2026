@@ -6,6 +6,7 @@
 #include <map>
 #include <string>
 #include <list>
+#include <unordered_map>
 
 #include "../utils/DynamicCast.h"
 #include "../utils/Meta.h"
@@ -22,13 +23,8 @@ using OpList = std::list<Op*>;
 using BlockList = std::list<Block*>;
 using AttrMap = std::map<std::string, const Attr*>;
 
-struct Type {
-  static Arena arena;
-  static void* operator new(size_t size) { return arena.allocate(size, alignof(Type)); }
-  static void operator delete(void*) noexcept {}
-  static void *operator new[](size_t) = delete;
-  static void operator delete[](void*) noexcept = delete;
-
+class Type {
+public:
   enum Kind {
     i32, i64, f32, vi4, vf4, ptr, fn, unit
   } kind;
@@ -41,14 +37,59 @@ struct Type {
   const Type *retType() const { assert(subtypes.size() >= 1); return subtypes.front(); }
   auto argTypes() const { assert(subtypes.size() >= 1); return std::vector(subtypes.begin() + 1, subtypes.end()); }
 
-  static Type *pointer(const Type *pointee) { return new Type(ptr, { pointee }); }
-  static Type *function(const Type *ret, std::vector<const Type *> subtypes) {
+  static Arena arena;
+  static void* operator new(size_t) = delete;
+  static void operator delete(void*) = delete;
+  static void *operator new[](size_t) = delete;
+  static void operator delete[](void*) noexcept = delete;
+private:
+  struct TypeKey {
+    Kind kind;
+    std::vector<const Type*> subs;
+
+    bool operator==(const TypeKey &o) const {
+      return kind == o.kind && subs == o.subs;
+    }
+  };
+  struct TypeKeyHash {
+    template <class T>
+    static void hash_combine(size_t &seed, const T& v) {
+      std::hash<T> hasher;
+      seed ^= hasher(v) + 0x9e3779b9 + (seed<<6) + (seed>>2);
+    }
+
+    size_t operator()(const TypeKey &k) const {
+      size_t h = std::hash<int>()(k.kind);
+      for (auto *t : k.subs)
+        hash_combine(h, (size_t) t);
+      return h;
+    }
+  };
+
+  using TypeCache = std::unordered_map<TypeKey, const Type*, TypeKeyHash>;
+  static TypeCache cache;
+public:
+  static const Type *get(Kind k, const std::vector<const Type*> &subtypes) {
+    TypeKey key{k, std::vector(subtypes.begin(), subtypes.end())};
+
+    auto it = cache.find(key);
+    if (it != cache.end())
+      return it->second;
+
+    void *mem = arena.allocate(sizeof(Type), alignof(Type));
+    auto *t = ::new (mem) Type(k, key.subs);
+    cache.emplace(std::move(key), t);
+    return t;
+  }
+  static const Type *pointer(const Type *pointee) { return get(ptr, { pointee }); }
+  static const Type *function(std::vector<const Type*> subtypes) { return get(fn, subtypes); }
+  static const Type *function(const Type *ret, std::vector<const Type *> subtypes) {
     subtypes.insert(subtypes.begin(), ret);
-    return new Type(fn, subtypes);
+    return get(fn, subtypes);
   }
 };
 
-extern Type *i32, *i64, *f32, *vi4, *vf4, *unit;
+extern const Type *i32, *i64, *f32, *vi4, *vf4, *unit;
 
 class Value;
 class Op {

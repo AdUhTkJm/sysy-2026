@@ -14,6 +14,7 @@ class Printer {
   std::ostringstream os;
   std::string bbPrefix = "bb";
   int depth = 0, bid = 0, vid = 0;
+  bool newline = true;
 
   using Print = void (*)(std::ostream &, const Op *op, Printer *printer);
   using PrintMap = std::unordered_map<size_t, Printer::Print>;
@@ -45,6 +46,7 @@ public:
   void addIdent(const Value *v, const std::string &str) { idents[v] = str; }
   void setBlockPrefix(const std::string &prefix) { bbPrefix = prefix; }
   void setIndent(int i) { depth = i; }
+  void setNewline(bool x) { newline = x; }
   
   void dump(std::ostream &os);
 } extern printer;

@@ -193,10 +193,24 @@ op(AddXPOp,
 
 complete_op_list(alignment_check)
 
+template<class T>
+struct OpKindOf { };
+
+#define opkind_map(Ty) \
+  template<> \
+  struct OpKindOf<Ty> { \
+    static constexpr OpKind value = OpKind::Ty; \
+  };
+
+complete_op_list(opkind_map);
+
+extern const std::map<std::string, OpKind> opkindNames;
+
 }
 
 #undef op
 #undef opkind
+#undef opkind_map
 #undef branch_op
 #undef imm_op
 #undef targetful_op

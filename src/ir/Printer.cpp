@@ -184,7 +184,7 @@ printer(AddWIOp) {
 }
 
 printer(AddXIOp) {
-  auto addwi = cast<AddWIOp>(op);
+  auto addwi = cast<AddXIOp>(op);
   os << "add " << printer->str(op->ret()) << ", " << printer->str(op->val()) << ", #" << addwi->value;
 }
 
@@ -344,7 +344,13 @@ printer(WriteRegOp) {
   std::string name = opt::regname(wr->reg);
   if (val->type == i32)
     name[0] = 'w';
-  os << "mov " << name << ", " << printer->str(val);
+
+  auto valreg = printer->str(val);
+  if (valreg == name) {
+    printer->setNewline(false);
+    return;
+  }
+  os << "mov " << name << ", " << valreg;
 }
 
 printer(ReadRegOp) {
@@ -353,7 +359,13 @@ printer(ReadRegOp) {
   std::string name = opt::regname(wr->reg);
   if (ret->type == i32)
     name[0] = 'w';
-  os << "mov " << printer->str(ret) << ", " << name;
+
+  auto retreg = printer->str(ret);
+  if (retreg == name) {
+    printer->setNewline(false);
+    return;
+  }
+  os << "mov " << retreg << ", " << name;
 }
 
 attr_printer(IntAttr) {
@@ -483,7 +495,9 @@ void Printer::print(const Region *region) {
 }
 
 void Printer::print(const Op *op) {
-  indent();
+  if (newline)
+    indent();
+  newline = true;
   auto printfn = dispatch()[op->id];
   assert(printfn);
   printfn(os, op, this);
@@ -491,7 +505,8 @@ void Printer::print(const Op *op) {
     print(attr);
   for (auto r : op->getRegions())
     print(r);
-  os << '\n';
+  if (newline)
+    os << '\n';
 }
 
 void Printer::print(const Attr *attr) {

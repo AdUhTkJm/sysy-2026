@@ -7,7 +7,7 @@ using namespace data;
 
 namespace ir {
 
-const std::map<std::string, Type*> CodeGen::external = {
+const std::map<std::string, const Type*> CodeGen::external = {
   { "putint", unit },
   { "putch", unit },
   { "putfloat", unit },
@@ -22,7 +22,7 @@ const std::map<std::string, Type*> CodeGen::external = {
   { "_sysy_stoptime", unit },
 };
 
-static Type *convert(ast::Type *type) {
+static const Type *convert(ast::Type *type) {
   if (isa<IntType>(type))
     return i32;
   if (isa<FloatType>(type))
@@ -44,7 +44,7 @@ static Type *convert(ast::Type *type) {
     args.reserve(fnTy->params.size());
     for (auto x : fnTy->params)
       args.push_back(convert(x));
-    return new Type(Type::fn, args);
+    return Type::function(args);
   }
 
   std::cout << type->toString() << "\n";
@@ -271,7 +271,7 @@ void CodeGen::emitStmt(ASTNode *node) {
 
   if (auto decl = dyn_cast<VarDeclNode>(node); decl && !decl->global) {
     auto arrTy = dyn_cast<ArrayType>(decl->type);
-    auto allocaTy = new Type(Type::ptr, { convert(arrTy ? arrTy->base : decl->type) });
+    auto allocaTy = Type::pointer(convert(arrTy ? arrTy->base : decl->type));
     auto alloca = builder.create<AllocaOp>(allocaTy);
     table[decl->name] = alloca->ret();
 
