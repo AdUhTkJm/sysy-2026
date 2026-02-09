@@ -2,7 +2,6 @@
 #define REGS_H
 
 #include <set>
-#include "../../ir/OpBase.h"
 
 #define regs_list(X) \
   /* x0 - x7: arguments */ \
@@ -84,7 +83,7 @@
   X(v30) \
   X(v31)
 
-namespace opt {
+namespace ir {
 
 constexpr int FP = 0, INT = 1;
 
@@ -215,11 +214,8 @@ constexpr int regcntf = sizeof(leafOrderf) / sizeof(leafOrderf[0]);
 static_assert(regcnt == sizeof(normalOrder) / sizeof(normalOrder[0]));
 static_assert(regcntf == sizeof(normalOrderf) / sizeof(normalOrderf[0]));
 
-inline int regbank(const ir::Type *ty) {
-  if (ty == ir::f32 || ty == ir::vi4 || ty == ir::vf4)
-    return FP;
-  return INT;
-}
+class Type;
+int regbank(const Type *ty);
 
 }
 

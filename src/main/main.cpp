@@ -30,6 +30,7 @@ void populate(opt::PassManager &pm) {
   add_pass(RegAlloc);
   add_pass(LateLegalize);
   add_pass(InstCombine);
+  add_pass(LowDCE);
   add_pass(Print);
 }
 

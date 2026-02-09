@@ -1,8 +1,8 @@
 #include "Printer.h"
 #include "Ops.h"
 #include "Attrs.h"
+#include "Regs.h"
 #include "../utils/DataStructure.h"
-#include "../opt/low/Regs.h"
 #include "../main/Options.h"
 #include <cstring>
 
@@ -341,7 +341,7 @@ printer(PhiOp) {
 printer(WriteRegOp) {
   auto wr = cast<WriteRegOp>(op);
   auto val = wr->val();
-  std::string name = opt::regname(wr->reg);
+  std::string name = regname(wr->reg);
   if (val->type == i32)
     name[0] = 'w';
 
@@ -356,7 +356,7 @@ printer(WriteRegOp) {
 printer(ReadRegOp) {
   auto wr = cast<ReadRegOp>(op);
   auto ret = wr->ret();
-  std::string name = opt::regname(wr->reg);
+  std::string name = regname(wr->reg);
   if (ret->type == i32)
     name[0] = 'w';
 

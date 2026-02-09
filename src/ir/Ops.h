@@ -59,7 +59,7 @@ public: \
   X(StoreOp) X(CallOp) X(GlobalArrayOp) X(GlobalOp) X(ReturnOp) \
   /* ARM operations */ \
   arm_branch_op_list(X) \
-  X(StrOp) X(StpOp) X(BOp) X(BlOp)
+  X(StrOp) X(StpOp) X(BOp) X(BlOp) X(RetOp)
 
 #define targetful_op(Ty, ...) \
   op(Ty, \

@@ -31,10 +31,12 @@ int strcmp_nocase(const char *l, const char *r) {
 
 void PassManager::run() {
   for (auto pass : passes) {
-    if (!strcmp_nocase(options.printBefore.c_str(), pass->name()))
+    if (options.printAll || !strcmp_nocase(options.printBefore.c_str(), pass->name()))
       std::cout << module;
+    
     pass->run();
-    if (!strcmp_nocase(options.printAfter.c_str(), pass->name()))
+
+    if (options.printAll || !strcmp_nocase(options.printAfter.c_str(), pass->name()))
       std::cout << module;
   }
 }

@@ -1,16 +1,8 @@
 #include "Matcher.h"
+#include "Printer.h" // IWYU pragma: keep
 #include <cstring>
 
 namespace {
-
-// Do a strcmp without case sensitivity.
-bool compare_name(const char *name, const char *tyname, unsigned sz) {
-  for (unsigned i = 0; i < sz; i++) {
-    if (tolower(tyname[i]) != tolower(name[i]))
-      return false;
-  }
-  return true;
-}
 
 enum Kind {
   LPar, RPar, Ident, Colon, End
@@ -47,7 +39,7 @@ Token Lexer::next() {
 
   unsigned v = --loc;
   for (; v < str.size(); v++) {
-    if (!(isalnum(str[v]) || str[v] == '_' || str[v] == '\''))
+    if (!(isalnum(str[v]) || str[v] == '_' || str[v] == '\'' || str[v] == '!'))
       break;
   }
   Token t { Ident, str.substr(loc, v - loc) };
@@ -98,9 +90,12 @@ const Pattern *Parser::parse() {
   }
 
   expect(LPar);
+  Pattern *pat;
   auto opname = expectIdent();
-  ir::OpKind kind = ir::opkindNames.at(std::string(opname));
-  auto pat = new Pattern(kind);
+  if (opname[0] == '!')
+    pat = new Pattern(actionNames.at(std::string(opname)));
+  else
+    pat = new Pattern(ir::opkindNames.at(std::string(opname)));
 
   if (cur.kind == Colon) {
     advance();
@@ -121,6 +116,11 @@ const Pattern *Parser::parse() {
 namespace ir::match {
 
 Arena Pattern::arena;
+
+#define actname(Ty, ...) { "!" #Ty, ActionKind::Ty },
+const std::map<std::string, ActionKind> actionNames {
+  action_list(actname)
+};
 
 void Env::refillTypes() {
   types["i32"] = i32;
@@ -160,55 +160,75 @@ Pattern::Pattern(decltype(kind) k, std::string_view n): kind(k) {
 Pattern::Pattern(OpKind kind): kind(Op), op(kind) {
 }
 
+Pattern::Pattern(ActionKind kind): kind(Action), act(kind) {
+}
+
+bool matchVar(Op *op, const Pattern *pattern, Env &env) {
+  if (!op || op->getNumResults() != 1)
+    return false;
+
+  // We must record the operation's type regardless of pattern kind.
+  if (strlen(pattern->tyname) != 0) {
+    if (auto it = env.types.find(pattern->tyname); it != env.types.end()) {
+      if (it->second != op->ret()->type)
+        return false;
+    }
+
+    env.types[pattern->tyname] = op->ret()->type;
+  }
+
+  // Then only deal with variables.
+  if (pattern->kind != Pattern::Var)
+    return false;
+  
+  if (auto it = env.vals.find(pattern->name); it != env.vals.end()) {
+    if (it->second->def != op)
+      return false;
+  }
+
+  env.vals[pattern->name] = op->ret();
+  return true;
+}
+
+Op *buildVar(Builder &, const Pattern *pattern, const Env &env) {
+  if (pattern->kind == Pattern::Var)
+    return env.vals.at(pattern->name)->def;
+
+  return nullptr;
+}
+
 static bool match(Op *op, const Pattern *pattern, Env &env) {
   auto it = adaptors.find(op->id);
   if (it == adaptors.end())
-    return false;
+    return matchVar(op, pattern, env);
 
   return it->second.match(op, pattern, env);
 }
 
 static Op *build(Builder &builder, const Pattern *pattern, const Env &env) {
-  auto it = adaptors.find(pattern->kind);
+  auto it = adaptors.find((int) pattern->op);
   if (it == adaptors.end())
-    return nullptr;
+    return buildVar(builder, pattern, env);
 
   return it->second.build(builder, pattern, env);
 }
 
 template<class T>
 bool matchEmptyImpl(Op *op, const Pattern *pattern, Env &env) {
-  if (!op || op->getNumResults() != 1 || pattern->kind == Pattern::Imm)
+  if (!op || op->getNumResults() > 1 || pattern->kind == Pattern::Imm)
     return false;
 
-  auto ret = op->ret();
-  if (pattern->kind == Pattern::Var) {
-    if (auto it = env.vals.find(pattern->name); it != env.vals.end()) {
-      if (it->second->def != op)
-        return false;
-    }
-
-    env.vals[pattern->name] = ret;
-  }
-
-  if (strlen(pattern->tyname) != 0) {
-    if (auto it = env.types.find(pattern->tyname); it != env.types.end()) {
-      if (it->second != ret->type)
-        return false;
-    }
-
-    env.types[pattern->name] = ret->type;
-  }
+  if (matchVar(op, pattern, env))
+    return true;
 
   if (op->getNumOperands() > 3)
     return false;
 
-  auto mnemonic = OpImpl<T, (int) OpKindOf<T>::value>::mnemonic;
-  if (!compare_name(pattern->name, mnemonic, mnemonic.size))
+  if (pattern->op != OpKindOf<T>::value || (unsigned) pattern->size() != op->getNumOperands())
     return false;
-  
+
   for (auto [i, pat] : data::enumerate(pattern->children)) {
-    if (pat && !match(op->getResult(i)->def, pat, env))
+    if (pat && !match(op->val(i)->def, pat, env))
       return false;
   }
   return true;
@@ -240,6 +260,9 @@ Op *buildEmptyImpl(Builder &builder, const Pattern *pattern, const Env &env) {
 
 template<class T>
 bool matchImmImpl(Op *op, const Pattern *pattern, Env &env) {
+  if (matchVar(op, pattern, env))
+    return true;
+
   Pattern pat(*pattern);
 
   auto size = pat.size();
@@ -252,18 +275,33 @@ bool matchImmImpl(Op *op, const Pattern *pattern, Env &env) {
   return matchEmptyImpl<T>(op, &pat, env);
 }
 
+#define binact(Ty, op) \
+  { ActionKind::Ty, [](int x, int y) { return x op y; } },
+
+int evaluate(const Pattern *pattern, const Env &env) {
+  if (pattern->kind == Pattern::Imm)
+    return env.imms.at(pattern->name);
+
+  assert(pattern->kind == Pattern::Action);
+  const static std::map<ActionKind, std::function<int(int, int)>> binmap {
+    action_list(binact)
+  };
+  return binmap.at(pattern->act)(
+    evaluate(pattern->children[0], env),
+    evaluate(pattern->children[1], env)
+  );
+}
+
 template<class T>
 Op *buildImmImpl(Builder &builder, const Pattern *pattern, const Env &env) {
   Pattern pat(*pattern);
 
   auto size = pat.size();
   auto &last = pat.children[size - 1];
-  assert(last->kind == Pattern::Imm);
-
-  auto value = env.imms.at(last->name);
+  auto value = evaluate(last, env);
   last = nullptr;
 
-  auto op = buildEmptyImpl<T>(builder, pattern, env);
+  auto op = buildEmptyImpl<T>(builder, &pat, env);
   cast<T>(op)->value = value;
 
   return op;
@@ -279,7 +317,7 @@ Adaptors adaptors {
 };
 
 Op *Rule::build(Builder &builder) {
-  if (!building || !pred(env))
+  if (!building || (pred && !(*pred)(env)))
     return nullptr;
 
   return ::build(builder, building, env);
@@ -297,7 +335,8 @@ Op *Rule::rewrite(Op *op) {
   Builder builder;
   builder.setBefore(op);
   auto after = build(builder);
-  op->ret()->replaceAllUsesWith(after->ret());
+  if (op->getNumResults() > 0)
+    op->ret()->replaceAllUsesWith(after->ret());
   op->erase();
   return after;
 }

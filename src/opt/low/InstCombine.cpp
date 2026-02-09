@@ -5,15 +5,20 @@ using namespace match;
 
 namespace opt {
 
+Pass *makeHighDCE(ir::ModuleOp *module);
+
 Rule rules[] = {
-  Rule("(addw x (movi 'a))") >> "(addwi:i64 x 'a)",
-  Rule("(str val (addx base (movi 'a)) 'b)") >> "(str val base (!add 'a 'b))",
+  Rule("(addw x (movi 'a))") >> "(addwi:i32 x 'a)",
+  Rule("(str (addxi base 'a) val 'b)") >> "(str base val (!add 'a 'b))",
+  Rule("(ldr:T (addxi base 'a) 'b)") >> "(ldr:T base (!add 'a 'b))",
 };
 
 declare_pass(InstCombine) {
-  walk(module, [](Op *op) {
-    for (auto &rule : rules)
-      rule.rewrite(op);
+  walk<Postorder>(module, [](Op *op) {
+    for (auto &rule : rules) {
+      if (rule.rewrite(op))
+        break;
+    }
   });
 }
 

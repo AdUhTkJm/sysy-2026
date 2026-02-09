@@ -58,7 +58,10 @@ while [[ $# -gt 0 ]] do
     shift 2;;
   --pt|--print-type|--types)
     printtype=1
-    shift ;;
+    shift;;
+  -a|--print-all)
+    printall=1
+    shift;;
   *)
     die "unknown argument: $1";;
   esac
@@ -105,6 +108,9 @@ if [[ -n $testcase ]]; then
   fi
   if [[ -n $output ]]; then
     cmd="$cmd -o $output"
+  fi
+  if [[ -n $printall ]]; then
+    cmd="$cmd --print-all"
   fi
   eval "ASAN_OPTIONS=detect_leaks=0 $cmd"
   check $? "hcc"

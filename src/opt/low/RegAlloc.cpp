@@ -33,9 +33,6 @@ void spill(Value *v, Region *region) {
 
 namespace opt {
 
-// This is publicly available once RegAlloc is done.
-std::unordered_map<Value*, Reg> assignment;
-
 declare_pass(RegAlloc,
   void runImpl(Region *region, bool isLeaf);
   void markBlockConflict(Block *bb);

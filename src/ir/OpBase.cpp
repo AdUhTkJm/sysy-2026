@@ -14,6 +14,7 @@ Arena Type::arena;
 Arena Value::arena;
 
 Type::TypeCache Type::cache;
+std::unordered_map<Value*, Reg> assignment;
 
 const Type *i32 = Type::get(Type::i32, {});
 const Type *i64 = Type::get(Type::i64, {});
@@ -226,6 +227,8 @@ void Value::replaceAllUsesWith(Value *other) {
 
       operand = other;
       other->uses.insert(use);
+      if (auto it = assignment.find(this); it != assignment.end())
+        assignment[other] = it->second;
     }
   }
   uses.clear();
@@ -842,6 +845,12 @@ Block *elseOf(Op *op) {
   default:
     return nullptr;
   }
+}
+
+int regbank(const Type *ty) {
+  if (ty == f32 || ty == vi4 || ty == vf4)
+    return FP;
+  return INT;
 }
 
 }

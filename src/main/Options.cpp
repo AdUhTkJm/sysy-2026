@@ -9,17 +9,7 @@
   }
 
 Options::Options() {
-  noLink = false;
-  dumpAST = false;
-  dumpMidIR = false;
-  o1 = false;
-  arm = false;
-  rv = false;
-  verbose = false;
-  stats = false;
-  verify = false;
-  sat = false;
-  bv = false;
+  memset((void *) this, 0, offsetof(Options, optEnd));
 }
 
 Options parseArgs(int argc, char **argv) {
@@ -66,8 +56,7 @@ Options parseArgs(int argc, char **argv) {
     PARSEOPT("--stats", stats);
     PARSEOPT("-s", stats);
     PARSEOPT("--verify", verify);
-    PARSEOPT("--bv", bv);
-    PARSEOPT("--sat", sat);
+    PARSEOPT("--print-all", printAll);
     PARSEOPT("--print-type", printType);
 
     if (opts.inputFile != "") {

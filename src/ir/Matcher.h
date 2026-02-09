@@ -4,6 +4,7 @@
 #include "Builder.h"
 #include <unordered_map>
 #include <functional>
+#include <optional>
 
 namespace ir::match {
 
@@ -17,14 +18,28 @@ struct Env {
   void refillTypes();
 };
 
+#define action_list(X) \
+  X(add, +) X(sub, -) X(mul, *) X(div, /) X(mod, %)
+
+#define action_decl(Ty, ...) Ty, 
+enum class ActionKind {
+  action_list(action_decl)
+};
+
+#undef action_decl
+extern const std::map<std::string, ActionKind> actionNames;
+
 struct Pattern {
-  enum { Var, Imm, Op } kind;
+  enum { Var, Imm, Op, Action } kind;
   char tyname[4] {};
   union {
     char name[32];           // For Var or Imm
     struct {                 // For Op NOLINT
       const Pattern *children[3] {};
-      OpKind op;
+      union {
+        ActionKind act;
+        OpKind op;
+      };
     };
   };
 
@@ -36,6 +51,7 @@ struct Pattern {
 
   Pattern(decltype(kind) k, std::string_view name);
   Pattern(OpKind kind);
+  Pattern(ActionKind kind);
 
   static const Pattern *make(std::string_view str);
   int size() const;
@@ -55,7 +71,7 @@ class Rule {
 
   const Pattern *matching, *building = nullptr;
   Env env;
-  Predicate pred;
+  std::optional<Predicate> pred;
   Builder builder;
 public:
   Rule(const char *str): Rule(std::string_view(str)) {}

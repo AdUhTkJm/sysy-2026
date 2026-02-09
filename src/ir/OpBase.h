@@ -11,6 +11,7 @@
 #include "../utils/DynamicCast.h"
 #include "../utils/Meta.h"
 #include "../utils/Alloc.h"
+#include "Regs.h"
 
 namespace ir {
 
@@ -416,6 +417,8 @@ Block *elseOf(Op *op);
 
 using Types = std::vector<const Type*>;
 using Values = std::vector<Value*>;
+
+extern std::unordered_map<Value*, Reg> assignment;
 
 }
 
