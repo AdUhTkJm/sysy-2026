@@ -25,7 +25,7 @@ public: \
   X(RetOp)
 
 #define arm_branch_op_list(X) \
-  X(BeqOp) X(BneOp) X(BltOp) X(BleOp) X(CbzOp) X(CbnzOp)
+  X(BeqOp) X(BneOp) X(BltOp) X(BleOp) X(CbzOp) X(CbnzOp) X(BgeOp) X(BgtOp)
 
 #define branch_op_list(X) \
   arm_branch_op_list(X) \
@@ -122,6 +122,8 @@ op(PhiOp,
   std::vector<Block*> targets;
 
   void addIncoming(Value *v, Block *bb);
+  void removeIncoming(Block *bb);
+  void replaceIncoming(Block *bb, Block *after);
   Value *incomingFrom(const Block *bb) const;
 
   class iterator {
@@ -205,6 +207,7 @@ struct OpKindOf { };
 complete_op_list(opkind_map);
 
 extern const std::map<std::string, OpKind> opkindNames;
+const char *kindname(OpKind kind);
 
 }
 

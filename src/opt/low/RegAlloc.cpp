@@ -37,7 +37,6 @@ declare_pass(RegAlloc,
   void runImpl(Region *region, bool isLeaf);
   void markBlockConflict(Block *bb);
   bool allocate(Block *bb, bool isLeaf);
-  void printModule();
   void clearState();
 
   std::unordered_map<Value*, Reg> tmpReg;
@@ -54,8 +53,6 @@ declare_pass(RegAlloc,
     auto calls = collectOps<CallOp>(x);
     runImpl(x->getRegion(), calls.empty());
   }
-
-  printModule();
 }
 
 void RegAlloc::markBlockConflict(Block *bb) {
@@ -229,9 +226,6 @@ bool RegAlloc::allocate(Block *bb, bool isLeaf) {
   return true;
 }
 
-void RegAlloc::printModule() {
-}
-
 void RegAlloc::clearState() {
   interf.clear();
   priority.clear();
@@ -243,15 +237,16 @@ void RegAlloc::clearState() {
 void RegAlloc::runImpl(Region *region, bool isLeaf) {
   region->updateLiveness();
 
-  for (auto bb : region->getBlocks()) {
-    bool success;
-    do {
-      clearState();
+  bool success;
+  do {
+    success = true;
+    clearState();
+    for (auto bb : region->getBlocks())
       markBlockConflict(bb);
-      success = allocate(bb, isLeaf);
-    } while (!success);
-    assignment.insert(tmpReg.begin(), tmpReg.end());
-  }
+    for (auto bb : region->getBlocks())
+      success &= allocate(bb, isLeaf);
+  } while (!success);
+  assignment.insert(tmpReg.begin(), tmpReg.end());
 }
 
 }

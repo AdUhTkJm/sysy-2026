@@ -335,6 +335,9 @@ Op *Rule::rewrite(Op *op) {
   Builder builder;
   builder.setBefore(op);
   auto after = build(builder);
+  if (!after)
+    return nullptr;
+  
   if (op->getNumResults() > 0)
     op->ret()->replaceAllUsesWith(after->ret());
   op->erase();

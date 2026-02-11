@@ -38,6 +38,9 @@ public:
   Builder() {}
   Builder(Op *op) { setBefore(op); }
 
+  // Maps from the original value to the copied value.
+  using Map = std::map<Value *, Value *>;
+
   void setBefore(Op *op);
   void setAfter(Op *op);
   void setToStart(Block *block);
@@ -91,6 +94,9 @@ public:
     replaceImpl(t, other);
     return t;
   }
+
+  void copy(Block *bb, Map &map);
+  Op *clone(Op *);
 
   IntOp *createInt(int i);
   FloatOp *createFloat(float f);

@@ -26,6 +26,8 @@ declare_pass(Lower,
 
 void Lower::runImpl(FuncOp *func) {
   Builder builder;
+  func->getRegion()->convertToPhi();
+
   rename(AddIOp, AddWOp);
   rename(AddLOp, AddXOp);
   rename(SubIOp, SubWOp);
@@ -60,7 +62,7 @@ void Lower::runImpl(FuncOp *func) {
   }
   for_all(BranchOp, func) {
     auto target = op->target, other = op->other;
-    auto cbz = builder.rename<CbzOp>(op);
+    auto cbz = builder.rename<CbnzOp>(op);
     cbz->target = target;
     cbz->other = other;
   }
@@ -88,8 +90,9 @@ void Lower::runImpl(FuncOp *func) {
   for (auto [i, arg] : data::enumerate(func->getResults())) {
     if (i == 0)
       continue;
+    // TODO: what happens when i >= 8?
     auto rd = builder.create<ReadRegOp>(arg->type);
-    rd->reg = regbank(arg->type) == INT ? argRegs[i] : fargRegs[i];
+    rd->reg = regbank(arg->type) == INT ? argRegs[i - 1] : fargRegs[i - 1];
     arg->replaceAllUsesWith(rd->ret());
   }
   for (unsigned i = func->getNumResults() - 1; i > 0; i--)
@@ -99,8 +102,6 @@ void Lower::runImpl(FuncOp *func) {
     hasInit = true;
   if (func->name == "main")
     main = func;
-
-  func->getRegion()->convertToPhi();
 };
 
 }

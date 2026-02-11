@@ -43,6 +43,9 @@ void Block::remove(iterator at) {
 }
 
 Block *Block::nextBlock() const {
+  if (this == parent->getLastBlock())
+    return nullptr;
+  
   auto it = place;
   return *++it;
 }
@@ -302,13 +305,16 @@ void Block::moveToEnd(Region *region) {
   parent->insert(parent->end(), this);
 }
 
-void Block::erase() {
-  auto copy = ops;
+void Block::prepareErase() {
   for (auto op : ops)
     op->clearOperands();
+}
+
+void Block::erase() {
+  auto copy = ops;
   for (auto op : copy)
     op->erase();
-  
+
   parent->remove(place);
   delete this;
 }
@@ -789,11 +795,26 @@ void Region::convertToPhi() {
       auto phi = builder.create<PhiOp>(arg->type);
       for (auto p : bb->preds) {
         auto last = p->getLastOp();
-        phi->addIncoming(last->val(i), p);
+        auto index = i + isa<BranchOp>(last);
+        phi->addIncoming(last->val(index), p);
       }
       arg->replaceAllUsesWith(phi->ret());
     }
     bb->clearArgs();
+  }
+
+  // Remove extra arguments.
+  for (auto bb : bbs) {
+    auto last = bb->getLastOp();
+    if (isa<JumpOp>(last)) {
+      last->clearOperands();
+      continue;
+    }
+    if (isa<BranchOp>(last)) {
+      auto cond = last->val();
+      last->clearOperands();
+      last->pushOperand(cond);
+    }
   }
 }
 
@@ -844,6 +865,56 @@ Block *elseOf(Op *op) {
   branch_op_list(elseof)
   default:
     return nullptr;
+  }
+}
+
+#define settarget(Ty) \
+  case (int) OpKind::Ty: \
+    cast<Ty>(op)->target = bb;
+
+void setTarget(Op *op, Block *bb) {
+  switch (op->id) {
+  targetful_op_list(settarget)
+  branch_op_list(settarget)
+  }
+}
+
+#define setelse(Ty) \
+  case (int) OpKind::Ty: \
+    cast<Ty>(op)->other = bb;
+
+void setElse(Op *op, Block *bb) {
+  switch (op->id) {
+  branch_op_list(setelse)
+  }
+}
+
+#define rewire_targetful(Ty) \
+  case (int) OpKind::Ty: {\
+    auto j = cast<Ty>(op); \
+    if (j->target == before) \
+      j->target = after; \
+    break; \
+  }
+
+#define rewire_branch(Ty) \
+  case (int) OpKind::Ty: {\
+    auto j = cast<Ty>(op); \
+    if (j->target == before) \
+      j->target = after; \
+    if (j->other == before) \
+      j->other = after; \
+    break; \
+  }
+
+void Block::rewire(Block *before, Block *after) {
+  // Fix the last operation.
+  auto op = getLastOp();
+  switch (op->id) {
+  targetful_op_list(rewire_targetful)
+  branch_op_list(rewire_branch)
+  default:
+    assert(false && "rewire: `before` is not found");
   }
 }
 

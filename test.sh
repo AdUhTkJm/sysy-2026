@@ -30,6 +30,12 @@ while [[ $# -gt 0 ]] do
     *) testcase=$2; v=2;;
     esac
     shift $v;;
+  -s|--run-asm)
+    if [[ $# -lt 2 ]]; then
+      die "expected assembly file name"
+    fi
+    asm=$2
+    shift 2;;
   -x|--execute)
     if [[ -z $output ]]; then
       output=temp/a.s
@@ -79,6 +85,14 @@ if [[ $ret -ne 0 ]]; then
 fi
 cd ..
 
+if [[ -n $asm ]]; then
+  aarch64-linux-gnu-gcc -x c test/lib.c -x assembler $asm -o temp/a.out -static
+  check $? "gnu \`as\`"
+  qemu-aarch64-static temp/a.out
+  echo; echo done.
+  exit 0
+fi
+
 if [[ -n $testcase ]]; then
   # Supply the leading zero.
   if [[ $testcase -ge 0 && $testcase -le 9 && $(echo $testcase | wc -c) -eq 2 ]]; then
@@ -115,7 +129,7 @@ if [[ -n $testcase ]]; then
   eval "ASAN_OPTIONS=detect_leaks=0 $cmd"
   check $? "hcc"
   if [[ -n $exec ]]; then
-    aarch64-linux-gnu-gcc -x assembler $output -o temp/a.out -static
+    aarch64-linux-gnu-gcc -x c test/lib.c -x assembler $output -o temp/a.out -static
     check $? "gnu \`as\`"
     qemu-aarch64-static temp/a.out
     # rm -f temp/a.out

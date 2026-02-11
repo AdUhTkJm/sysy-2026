@@ -41,6 +41,7 @@ public:
   void printResults(const Op *op, unsigned from = 0);
   void printOperands(const Op *op, unsigned from = 0);
   void printType(const Type *type);
+  void printNewline();
 
   void reset();
   void addIdent(const Value *v, const std::string &str) { idents[v] = str; }

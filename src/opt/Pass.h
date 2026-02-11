@@ -63,6 +63,17 @@ protected:
   }
 
   template<class T>
+  // Note: this only traverses a single layer.
+  std::vector<T*> collectOps(ir::Block *bb) {
+    std::vector<T*> result;
+    for (auto op : *bb) {
+      if (auto x = dyn_cast<T>(op))
+        result.push_back(x);
+    }
+    return result;
+  }
+
+  template<class T>
   std::vector<T*> collectOps() { return collectOps<T>(module); }
 
   template<class T = Preorder, class F> __requires((std::invocable<F, ir::Op*>) && walk_order<T>)

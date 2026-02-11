@@ -1,5 +1,8 @@
 #include "Common.h"
+#include "../../ir/Matcher.h"
 #include <algorithm>
+
+using namespace match;
 
 namespace opt {
 
@@ -10,19 +13,47 @@ static int asmSize(AllocaOp *op) {
   return sz;
 }
 
-ReadRegOp *createAssignedRd(Builder &builder, Reg reg) {
-  auto rd = builder.create<ReadRegOp>(i64);
-  assignment[rd->ret()] = reg;
-  rd->reg = reg;
-  return rd;
+static Rule rules[] = {
+  Rule("(str (addxi base 'a) val 'b)") >> "(str base val (!add 'a 'b))",
+  Rule("(ldr:T (addxi base 'a) 'b)") >> "(ldr:T base (!add 'a 'b))",
+};
+
+#define cvt_impl(Before, After) \
+  if (auto br = dyn_cast<Before>(op)) { \
+    auto other = br->other; \
+    auto renamed = builder.rename<After>(op); \
+    renamed->target = other; \
+    renamed->other = nullptr; \
+    return renamed; \
+  }
+
+#define cvt(A, B) cvt_impl(A, B) cvt_impl(B, A)
+
+static Op *flip(Op *op) {
+  Builder builder;
+  cvt(CbzOp, CbnzOp)
+  cvt(BeqOp, BneOp)
+  cvt(BltOp, BgeOp)
+  cvt(BleOp, BgtOp)
+  assert(false && "should only flip branches!");
 }
 
 declare_local_pass(LateLegalize,
   void prologue(FuncOp *func);
   void relocateAlloca(FuncOp *func);
+  void rewriteJumps(Block *bb);
+  void cleanup();
+
+  std::vector<Op*> clean;
 ) {
   prologue(func);
   relocateAlloca(func);
+
+  auto region = func->getRegion();
+  for (auto bb : *region)
+    rewriteJumps(bb);
+
+  cleanup();
 }
 
 void LateLegalize::prologue(FuncOp *func) {
@@ -95,42 +126,101 @@ void LateLegalize::relocateAlloca(FuncOp *func) {
   builder.setToStart(region);
   for (auto alloca : allocas) {
     int sz = asmSize(alloca);
-    total += sz;
 
-    // This alloca is equivalently `sp + sz`.
+    // This alloca is equivalently `sp + total`.
     auto rd = createAssignedRd(builder, sp);
-
     auto add = builder.create<AddXIOp>(i64)->with(rd->ret());
-    add->value = sz;
+    add->value = total;
     // This should always have been combined.
-    assignment[add->ret()] = unallocated;
+    // If it isn't, then it's always `add sp, sp, #0` and is hence `sp`.
+    assignment[add->ret()] = sp;
+    clean.push_back(add);
 
     alloca->ret()->replaceAllUsesWith(add->ret());
     alloca->erase();
+
+    total += sz;
   }
 
   // Finally, we must round up `total` to 16 bytes, and subtract `total` from sp.
   total = (total + 15) / 16 * 16;
-  builder.setToStart(region);
-  auto rd = createAssignedRd(builder, sp);
+  if (total > 0) {
+    builder.setToStart(region);
+    auto rd = createAssignedRd(builder, sp);
 
-  auto add = builder.create<AddXIOp>(i64)->with(rd->ret());
-  add->value = -total;
-  assignment[add->ret()] = sp;
+    auto add = builder.create<AddXIOp>(i64)->with(rd->ret());
+    add->value = -total;
+    assignment[add->ret()] = sp;
 
-  auto wr = builder.create<WriteRegOp>()->with(add->ret());
-  wr->reg = sp;
+    auto wr = builder.create<WriteRegOp>()->with(add->ret());
+    wr->reg = sp;
 
-  // Similarly, it must be restored at the end of function.
-  builder.setBefore(region->getLastOp());
-  rd = createAssignedRd(builder, sp);
+    // Similarly, it must be restored at the end of function.
+    builder.setBefore(region->getLastOp());
+    rd = createAssignedRd(builder, sp);
 
-  add = builder.create<AddXIOp>(i64)->with(rd->ret());
-  add->value = total;
-  assignment[add->ret()] = sp;
+    add = builder.create<AddXIOp>(i64)->with(rd->ret());
+    add->value = total;
+    assignment[add->ret()] = sp;
 
-  wr = builder.create<WriteRegOp>()->with(add->ret());
-  wr->reg = sp;
+    wr = builder.create<WriteRegOp>()->with(add->ret());
+    wr->reg = sp;
+  }
+
+  // Try to fold the extra addition we've just introduced.
+  fixed(walk<Postorder>(func, [&](Op *op) {
+    for (auto &rule : rules) {
+      if (rule.rewrite(op)) {
+        mark_changed;
+        break;
+      }
+    }
+  });)
+}
+
+void LateLegalize::rewriteJumps(Block *bb) {
+  auto op = bb->getLastOp();
+  auto target = targetOf(op);
+  auto other = elseOf(op);
+  if (!target)
+    return;
+
+  // This is a jump. Omit it if it jumps to the next block.
+  auto next = bb->nextBlock();
+  if (!other) {
+    if (target == next)
+      op->erase();
+    return;
+  }
+
+  // Now we know it's a branch.
+  // When the `else` branch falls through, then it's unchanged.
+  if (other == next) {
+    setElse(op, nullptr);
+    return;
+  }
+
+  // When the `target` branch falls through, the one must be flipped.
+  if (target == next) {
+    flip(op);
+    return;
+  }
+
+  // Both branch don't fall through. Add a jump to `other`.
+  Builder builder;
+  builder.setAfter(op);
+  setElse(op, nullptr);
+  builder.create<BOp>()->target = other;
+}
+
+void LateLegalize::cleanup() {
+  for (auto op : clean) {
+    if (std::all_of(op->getResults().begin(), op->getResults().end(), [](Value *v){
+      return !v->used();
+    }))
+      op->erase();
+  }
+  clean.clear();
 }
 
 }

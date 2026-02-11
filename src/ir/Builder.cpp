@@ -49,4 +49,45 @@ ModuleOp *Builder::createModule() {
   return new ModuleOp(nullptr, OpList::iterator());
 }
 
+#define caseof(Ty) case (int) OpKind::Ty:
+#define basecopy(Ty) create<Ty>(op->getResultTypes())->with(op->getOperands())
+#define clone_empty(Ty) \
+  caseof(Ty) basecopy(Ty); break;
+#define clone_targetful(Ty) \
+  caseof(Ty) { \
+    auto target = cast<Ty>(op)->target; \
+    auto x = basecopy(Ty); \
+    x->target = target; \
+    break; \
+  }
+
+Op *Builder::clone(Op *op) {
+  switch (op->id) {
+  empty_op_list(clone_empty)
+  targetful_op_list(clone_targetful)
+  }
+
+  std::cout << "unknown op kind: " << kindname((OpKind) op->id);
+  assert(false && "cannot get here!");
+  return nullptr;
+}
+
+void Builder::copy(Block *bb, Map &map) {
+  for (auto op : *bb) {
+    auto cloned = clone(op);
+    for (auto [i, ret] : data::enumerate(cloned->getResults()))
+      map[op->ret(i)] = ret;
+  }
+  // Rewire operands.
+  for (auto op : *bb) {
+    for (unsigned i = 0; i < op->getNumOperands(); i++) {
+      auto it = map.find(op->val(i));
+      if (it == map.end())
+        continue;
+
+      op->setOperand(i, it->second);
+    }
+  }
+}
+
 }

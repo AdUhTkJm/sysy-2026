@@ -1,5 +1,6 @@
 #include "Ops.h"
 #include "../utils/DataStructure.h"
+#include <algorithm>
 
 namespace ir {
 
@@ -25,7 +26,26 @@ Value *PhiOp::incomingFrom(const Block *bb) const {
     if (t == bb)
       return val(i);
   }
+  assert(false && "no incoming from `bb`!");
   return nullptr;
+}
+
+void PhiOp::removeIncoming(Block *bb) {
+  auto it = std::find(targets.begin(), targets.end(), bb);
+  if (it == targets.end())
+    return;
+
+  size_t index = it - targets.begin();
+  targets.erase(it);
+  removeOperand(index);
+}
+
+void PhiOp::replaceIncoming(Block *bb, Block *after) {
+  auto it = std::find(targets.begin(), targets.end(), bb);
+  if (it == targets.end())
+    return;
+
+  *it = after;
 }
 
 #define isa(Ty) isa<Ty>(op) ||
@@ -47,9 +67,19 @@ std::string stripped(const char *s) {
 
 #define opkind_name_map(Ty) \
   { stripped(#Ty), OpKind::Ty },
+#define opkind_name_rev(Ty) \
+  case OpKind::Ty: return #Ty;
 
 const std::map<std::string, OpKind> opkindNames {
   complete_op_list(opkind_name_map)
 };
+
+const char *kindname(OpKind kind) {
+  switch (kind) {
+  complete_op_list(opkind_name_rev)
+  default:
+    assert(false && "not a valid opkind!");
+  }
+}
 
 }

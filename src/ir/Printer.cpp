@@ -13,7 +13,13 @@ Printer printer;
 void printWithFormat(std::ostream &os, const Op *op, Printer *printer, const char *fmt) {
   for (const char *p = fmt; *p;) {
     if (*p != '$') {
-      os << *p++;
+      auto c = *p++;
+      if (c == '\n') {
+        printer->printNewline();
+        continue;
+      }
+
+      os << c;
       continue;
     }
 
@@ -170,12 +176,12 @@ format(SubWOp, "sub $r0, $x0, $x1");
 format(SubXOp, "sub $R0, $X0, $X1");
 format(MulWOp, "mul $r0, $x0, $x1");
 format(MulXOp, "mul $R0, $X0, $X1");
-format(DivWOp, "div $r0, $x0, $x1");
-format(DivXOp, "div $R0, $X0, $X1");
-format(CmpEqOp, "cmp.eq $r0, $x0, $x1");
-format(CmpNeOp, "cmp.ne $r0, $x0, $x1");
-format(CmpLtOp, "cmp.lt $r0, $x0, $x1");
-format(CmpLeOp, "cmp.le $r0, $x0, $x1");
+format(DivWOp, "sdiv $r0, $x0, $x1");
+format(DivXOp, "sdiv $R0, $X0, $X1");
+format(CmpEqOp, "cmp $x0, $x1\ncset $r0, eq");
+format(CmpNeOp, "cmp $x0, $x1\ncset $r0, ne");
+format(CmpLtOp, "cmp $x0, $x1\ncset $r0, lt");
+format(CmpLeOp, "cmp $x0, $x1\ncset $r0, le");
 format(RetOp, "ret");
 
 printer(AddWIOp) {
@@ -248,10 +254,21 @@ printer(BlOp) {
     auto br = cast<Ty>(op); \
     std::string x = #Ty; \
     x[0] = tolower(x[0]); \
-    x = x.substr(0, x.size() - 2); /* Remove the final 'Op' */ \
-    os << x << ' '; \
+    x = x.substr(0, x.size() - 2); /* Remove the final 'Op'. */ \
+    if (x[0] == 'c') { /* `cbz` and `cbnz` take one register. */ \
+      os << x << ' '; \
+      printer->printOperands(op); \
+      os << ", " << printer->str(br->target); \
+      if (br->other) \
+        os << ", " << printer->str(br->other); \
+      return; \
+    } \
+    assert(x[0] == 'b'); /* b.eq set of instructions need a cmp before them. */ \
+    x.insert(x.begin() + 1, '.'); /* Change `beq` to `b.eq`. */ \
+    os << "cmp "; \
     printer->printOperands(op); \
-    os << ", " << printer->str(br->target); \
+    printer->printNewline(); \
+    os << x << ' ' << printer->str(br->target); \
     if (br->other) \
       os << ", " << printer->str(br->other); \
   }
@@ -333,7 +350,7 @@ printer(BranchOp) {
 
 printer(PhiOp) {
   auto phi = cast<PhiOp>(op);
-  os << "phi ";
+  os << "phi " << printer->str(phi->ret()) << ' ';
   for (auto [value, block] : *phi)
     os << "[ " << printer->str(value) << ", " << printer->str(block) << " ] ";
 }
@@ -456,6 +473,11 @@ std::string Printer::str(const Block *block) {
 void Printer::indent() {
   for (int i = 0; i < depth; i++)
     os << "  ";
+}
+
+void Printer::printNewline() {
+  os << "\n";
+  indent();
 }
 
 void Printer::printImpl(const Block *bb, bool tag) {

@@ -79,6 +79,7 @@ public:
   Rule(const Pattern *match): matching(match) {}
   Rule &operator>>(std::string_view str) { return *this >> Pattern::make(str); }
   Rule &operator>>(const Pattern *build) { building = build; return *this; }
+  Rule &operator&(const Predicate &p) { pred = p; return *this; }
 
   bool match(Op *op);
   Op *build(Builder &builder);

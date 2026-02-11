@@ -113,8 +113,8 @@ public:
   static void* operator new[](size_t) = delete;
   static void operator delete[](void*) = delete;
 
-  const unsigned long id;
-  Op(Block *parent, OpList::iterator place, unsigned long id): parent(parent), place(place), id(id) {}
+  const int id;
+  Op(Block *parent, OpList::iterator place, int id): parent(parent), place(place), id(id) {}
   virtual ~Op();
 
   Op *nextOp() const;
@@ -354,7 +354,9 @@ public:
 
   const auto &getDominanceFrontier() const { return domFront; }
 
+  void prepareErase();
   void erase();
+  void rewire(Block *before, Block *after);
   
   iterator begin() { return ops.begin(); }
   iterator end() { return ops.end(); }
@@ -414,6 +416,8 @@ public:
 // Helpers.
 Block *targetOf(Op *op);
 Block *elseOf(Op *op);
+void setTarget(Op *op, Block *bb);
+void setElse(Op *op, Block *bb);
 
 using Types = std::vector<const Type*>;
 using Values = std::vector<Value*>;
