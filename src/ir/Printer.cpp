@@ -11,11 +11,19 @@ namespace ir {
 Printer printer;
 
 void printWithFormat(std::ostream &os, const Op *op, Printer *printer, const char *fmt) {
+  // The '\\' at front means this is a hidden operation.
+  if (*fmt == '\\') {
+    if (!printer->showHidden)
+      return;
+
+    fmt++;
+  }
+
   for (const char *p = fmt; *p;) {
     if (*p != '$') {
       auto c = *p++;
       if (c == '\n') {
-        printer->printNewline();
+        printer->printNewline(os);
         continue;
       }
 
@@ -29,7 +37,7 @@ void printWithFormat(std::ostream &os, const Op *op, Printer *printer, const cha
     case 'x': {
       if (*p == '>') {
         p++;
-        printer->printOperands(op, *p++ - '0');
+        printer->printOperands(os, op, *p++ - '0');
         break;
       }
       int index = *p++ - '0';
@@ -46,7 +54,7 @@ void printWithFormat(std::ostream &os, const Op *op, Printer *printer, const cha
     case 'R': {
       if (*p == '>') {
         p++;
-        printer->printResults(op, *p++ - '0');
+        printer->printResults(os, op, *p++ - '0');
         // The `=` is unnecessary when the result is empty.
         if (strncmp(p, " = ", 3) == 0 && op->getNumResults() == 0)
           p += 3;
@@ -61,7 +69,7 @@ void printWithFormat(std::ostream &os, const Op *op, Printer *printer, const cha
       int index = *p++ - '0';
       assert(dis == 'r' || dis == 'x');
       Value *v = dis == 'r' ? op->ret(index) : op->val(index);
-      printer->printType(v->type);
+      printer->printType(os, v->type);
       break;
     }
     default:
@@ -70,7 +78,7 @@ void printWithFormat(std::ostream &os, const Op *op, Printer *printer, const cha
   }
 }
 
-void Printer::printResults(const Op *op, unsigned from) {
+void Printer::printResults(std::ostream &os, const Op *op, unsigned from) {
   for (size_t i = from; i < op->getNumResults(); i++) {
     os << str(op->ret(i));
     if (i != op->getNumResults() - 1)
@@ -78,7 +86,7 @@ void Printer::printResults(const Op *op, unsigned from) {
   }
 }
 
-void Printer::printOperands(const Op *op, unsigned from) {
+void Printer::printOperands(std::ostream &os, const Op *op, unsigned from) {
   for (size_t i = from; i < op->getNumOperands(); i++) {
     os << str(op->val(i));
     if (i != op->getNumOperands() - 1)
@@ -86,7 +94,7 @@ void Printer::printOperands(const Op *op, unsigned from) {
   }
 }
 
-void Printer::printTypeTo(const Type *type, std::ostream &os) {
+void Printer::printType(std::ostream &os, const Type *type) {
   switch (type->kind) {
   case Type::i32:
     os << "i32";
@@ -107,25 +115,21 @@ void Printer::printTypeTo(const Type *type, std::ostream &os) {
     os << "unit";
     break;
   case Type::ptr:
-    printTypeTo(type->pointee(), os);
+    printType(os, type->pointee());
     os << "*";
     break;
   case Type::fn: {
     os << "(";
     const auto &args = type->argTypes();
     for (auto [i, x] : data::enumerate(args)) {
-      printTypeTo(x, os);
+      printType(os, x);
       if (i != args.size())
         os << ", ";
     }
     os << ")";
-    printTypeTo(type->retType(), os);
+    printType(os, type->retType());
   }
   }
-}
-
-void Printer::printType(const Type *type) {
-  printTypeTo(type, os);
 }
 
 #define printer(Ty) void print##Ty(std::ostream &os, const Op *op, Printer *printer)
@@ -167,7 +171,7 @@ format(YieldOp, "yield $x>0");
 format(ConditionOp, "condition($x0); $x>1");
 format(I2FOp, "$r0 = (f32) $x0");
 format(F2IOp, "$r0 = (i32) $x0");
-format(UndefOp, "$r0 = undef $tr0");
+format(UndefOp, "\\$r0 = undef $tr0");
 format(DoWhileOp, "$r>0 = do-while $x>0");
 /* ARM operations */
 format(AddWOp, "add $r0, $x0, $x1");
@@ -212,14 +216,14 @@ printer(StrOp) {
 printer(LdpOp) {
   auto ldr = cast<LdpOp>(op);
   os << "ldp ";
-  printer->printResults(ldr);
+  printer->printResults(os, ldr);
   os << ", [" << printer->str(op->val()) << ", #" << ldr->value << "]";
 }
 
 printer(StpOp) {
   auto str = cast<StpOp>(op);
   os << "stp ";
-  printer->printOperands(op, 1);
+  printer->printOperands(os, op, 1);
   os << ", [" << printer->str(op->val(0)) << ", #" << str->value << "]";
 }
 
@@ -239,12 +243,11 @@ printer(BOp) {
 }
 
 printer(BlOp) {
-  (void) printer;
   auto call = cast<BlOp>(op);
   os << "bl " << call->name;
   if (op->getNumOperands() > 0) {
     os << "(";
-    printer->printOperands(op);
+    printer->printOperands(os, op);
     os << ")";
   }
 }
@@ -257,7 +260,7 @@ printer(BlOp) {
     x = x.substr(0, x.size() - 2); /* Remove the final 'Op'. */ \
     if (x[0] == 'c') { /* `cbz` and `cbnz` take one register. */ \
       os << x << ' '; \
-      printer->printOperands(op); \
+      printer->printOperands(os, op); \
       os << ", " << printer->str(br->target); \
       if (br->other) \
         os << ", " << printer->str(br->other); \
@@ -266,8 +269,8 @@ printer(BlOp) {
     assert(x[0] == 'b'); /* b.eq set of instructions need a cmp before them. */ \
     x.insert(x.begin() + 1, '.'); /* Change `beq` to `b.eq`. */ \
     os << "cmp "; \
-    printer->printOperands(op); \
-    printer->printNewline(); \
+    printer->printOperands(os, op); \
+    printer->printNewline(os); \
     os << x << ' ' << printer->str(br->target); \
     if (br->other) \
       os << ", " << printer->str(br->other); \
@@ -277,24 +280,24 @@ arm_branch_op_list(arm_branch_printer)
 
 printer(ExternCallOp) {
   auto extc = cast<ExternCallOp>(op);
-  printer->printResults(op);
+  printer->printResults(os, op);
   if (extc->getNumResults() > 0)
     os << " = ";
   os << extc->name << "(";
-  printer->printOperands(op);
+  printer->printOperands(os, op);
   os << ')';
 }
 
 printer(GlobalOp) {
   auto glob = cast<GlobalOp>(op);
   os << printer->str(glob->ret()) << " = " << glob->name << ": ";
-  printer->printType(glob->ret()->type);
+  printer->printType(os, glob->ret()->type);
 }
 
 printer(AllocaOp) {
   auto ret = op->ret();
   os << printer->str(ret) << " = alloca ";
-  printer->printType(ret->type->pointee());
+  printer->printType(os, ret->type->pointee());
 }
 
 printer(ArrayStoreOp) {
@@ -317,7 +320,7 @@ printer(FuncOp) {
   os << printer->str(fn->getHandle());
   // Print argument list.
   os << "(";
-  printer->printResults(fn, 1);
+  printer->printResults(os, fn, 1);
   os << ")";
 }
 
@@ -334,7 +337,7 @@ printer(JumpOp) {
   os << "=> " << printer->str(jmp->target);
   if (jmp->getNumOperands() > 0) {
     os << "(";
-    printer->printOperands(jmp);
+    printer->printOperands(os, jmp);
     os << ")";
   }
 }
@@ -344,7 +347,7 @@ printer(BranchOp) {
   os << "=> " << printer->str(op->val(0)) << " ? " << printer->str(br->target) << " : " << printer->str(br->other);
   if (br->getNumOperands() > 1) {
     os << " with ";
-    printer->printOperands(br, 1);
+    printer->printOperands(os, br, 1);
   }
 }
 
@@ -363,10 +366,8 @@ printer(WriteRegOp) {
     name[0] = 'w';
 
   auto valreg = printer->str(val);
-  if (valreg == name) {
-    printer->setNewline(false);
+  if (valreg == name && !printer->showHidden)
     return;
-  }
   os << "mov " << name << ", " << valreg;
 }
 
@@ -378,10 +379,8 @@ printer(ReadRegOp) {
     name[0] = 'w';
 
   auto retreg = printer->str(ret);
-  if (retreg == name) {
-    printer->setNewline(false);
+  if (retreg == name && !printer->showHidden)
     return;
-  }
   os << "mov " << retreg << ", " << name;
 }
 
@@ -458,7 +457,7 @@ std::string Printer::str(const Value *value) {
   if (options.printType) {
     std::stringstream ss;
     ss << "(" << name << ": ";
-    printTypeTo(value->type, ss);
+    printType(ss, value->type);
     ss << ")";
     return ss.str();
   }
@@ -470,21 +469,21 @@ std::string Printer::str(const Block *block) {
   return bbPrefix + std::to_string(id(block));
 }
 
-void Printer::indent() {
+void Printer::indent(std::ostream &os) {
   for (int i = 0; i < depth; i++)
     os << "  ";
 }
 
-void Printer::printNewline() {
+void Printer::printNewline(std::ostream &os) {
   os << "\n";
-  indent();
+  indent(os);
 }
 
 void Printer::printImpl(const Block *bb, bool tag) {
   auto numArgs = bb->getNumArgs();
   if (tag || numArgs != 0 || bbPrefix != "bb") {
     depth--;
-    indent();
+    indent(os);
     os << str(bb);
     if (numArgs > 0) {
       os << "(" << str(bb->arg(0));
@@ -512,22 +511,26 @@ void Printer::print(const Region *region) {
     printImpl(bb, tag);
   
   depth--;
-  indent();
+  indent(os);
   os << "}";
 }
 
 void Printer::print(const Op *op) {
-  if (newline)
-    indent();
-  newline = true;
   auto printfn = dispatch()[op->id];
   assert(printfn);
-  printfn(os, op, this);
+  
+  std::stringstream ss("");
+  printfn(ss, op, this);
+  auto str = ss.str();
+
+  if (!str.empty())
+    indent(os);
+  os << str;
   for (const auto &[_, attr] : op->getAttrs())
     print(attr);
   for (auto r : op->getRegions())
     print(r);
-  if (newline)
+  if (!str.empty())
     os << '\n';
 }
 

@@ -870,7 +870,7 @@ Block *elseOf(Op *op) {
 
 #define settarget(Ty) \
   case (int) OpKind::Ty: \
-    cast<Ty>(op)->target = bb;
+    cast<Ty>(op)->target = bb; break;
 
 void setTarget(Op *op, Block *bb) {
   switch (op->id) {
@@ -881,7 +881,7 @@ void setTarget(Op *op, Block *bb) {
 
 #define setelse(Ty) \
   case (int) OpKind::Ty: \
-    cast<Ty>(op)->other = bb;
+    cast<Ty>(op)->other = bb; break;
 
 void setElse(Op *op, Block *bb) {
   switch (op->id) {

@@ -28,6 +28,12 @@ declare_local_pass(LowerPostSchedule) {
       ret->replaceAllUsesWith(rd->ret());
       op->clearResults();
     }
+
+    // Give functions more results, to mark conflicts.
+    for (auto reg : callerSaved) {
+      auto value = op->pushResult(i64);
+      assignment[value] = reg;
+    }
   }
 
   for_all(ReturnOp, func) {

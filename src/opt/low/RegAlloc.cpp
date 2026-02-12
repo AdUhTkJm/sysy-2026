@@ -150,7 +150,7 @@ bool RegAlloc::allocate(Block *bb, bool isLeaf) {
 
   for (auto op : *bb) {
     for (auto v : op->getResults()) {
-      if (tmpReg.count(v))
+      if (tmpReg.count(v) || assignment.count(v))
         continue;
 
       std::set<Reg> bad, unpreferred;
@@ -159,6 +159,8 @@ bool RegAlloc::allocate(Block *bb, bool isLeaf) {
         // In the whole function, `sp` and `zero` are read-only.
         if (tmpReg.count(z) && tmpReg[z] != sp && tmpReg[z] != xzr)
           bad.insert(tmpReg[z]);
+        if (assignment.count(z) && assignment[z] != sp && assignment[z] != xzr)
+          bad.insert(assignment[z]);
       }
 
       if (isa<PhiOp>(op)) {
@@ -168,6 +170,8 @@ bool RegAlloc::allocate(Block *bb, bool isLeaf) {
           for (auto v : interf[x]) {
             if (tmpReg.count(v) && tmpReg[v] != sp && tmpReg[v] != xzr)
               unpreferred.insert(tmpReg[v]);
+            if (assignment.count(v) && assignment[v] != sp && assignment[v] != xzr)
+              unpreferred.insert(assignment[v]);
           }
         }
       }
@@ -177,6 +181,11 @@ bool RegAlloc::allocate(Block *bb, bool isLeaf) {
         // Try to allocate the same register as `ref`.
         if (tmpReg.count(ref) && !bad.count(tmpReg[ref])) {
           tmpReg[v] = tmpReg[ref];
+          continue;
+        }
+        // Try to allocate the same register as `ref`.
+        if (assignment.count(ref) && !bad.count(assignment[ref])) {
+          tmpReg[v] = assignment[ref];
           continue;
         }
       }
@@ -247,6 +256,8 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
       success &= allocate(bb, isLeaf);
   } while (!success);
   assignment.insert(tmpReg.begin(), tmpReg.end());
+  for_all(BlOp, region->getParentOp())
+    op->clearResults();
 }
 
 }

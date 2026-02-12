@@ -257,9 +257,7 @@ public:
   bool used() const { return uses.size() > 0; }
 
   static Arena arena;
-  static void* operator new(size_t size) {
-    return arena.allocate(size, alignof(Value));
-  }
+  static void* operator new(size_t size) { return arena.allocate(size, alignof(Value)); }
   static void operator delete(void*) noexcept {}
 };
 

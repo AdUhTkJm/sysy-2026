@@ -41,7 +41,7 @@ Options parseArgs(int argc, char **argv) {
     }
 
     if (strcmp(argv[i], "-i") == 0) {
-      opts.simulateInput = argv[i + 1];
+      opts.interpretInput = argv[i + 1];
       i++;
       continue;
     }
@@ -58,6 +58,7 @@ Options parseArgs(int argc, char **argv) {
     PARSEOPT("--verify", verify);
     PARSEOPT("--print-all", printAll);
     PARSEOPT("--print-type", printType);
+    PARSEOPT("--interpret", interpret);
 
     if (opts.inputFile != "") {
       std::cerr << "error: multiple inputs\n";

@@ -19,7 +19,7 @@ void DestroyPhi::splitCriticalEdge(Region *region) {
   std::vector<std::pair<Block*, Block*>> edges;
   for (auto bb : *region) {
     for (auto succ : bb->succs) {
-      if (succ->preds.size() <= 1)
+      if (succ->preds.size() <= 1 && bb->succs.size() <= 1)
         continue;
 
       // The edge from `bb` to `succ` is a critical edge,
@@ -57,15 +57,15 @@ void DestroyPhi::lowerPhi(Block *bb) {
 
   for (auto pred : bb->preds) {
     Builder builder(pred->getLastOp());
-    const auto &emitCopy = [&](Reg src, Reg dst) {
-      auto rd = createAssignedRd(builder, src);
+    const auto &emitCopy = [&](Reg src, Reg dst, const Type *ty) {
+      auto rd = createAssignedRd(builder, src, ty);
 
       auto wr = builder.create<WriteRegOp>()->with(rd->ret());
       wr->reg = dst;
     };
 
     // Maps dst to src.
-    std::unordered_map<Reg, Reg> copy;
+    std::unordered_map<Reg, std::pair<Reg, const Type*>> copy;
     std::set<Reg> srcs;
 
     for (auto phi : phis) {
@@ -74,16 +74,17 @@ void DestroyPhi::lowerPhi(Block *bb) {
       if (src == dst)
         continue;
 
-      copy[dst] = src;
+      copy[dst] = { src, phi->ret()->type };
       srcs.insert(src);
     }
 
     // First deal with acyclic parts, and remove them from `copy`.
     fixed(for (auto it = copy.begin(); it != copy.end(); ) {
-      auto [dst, src] = *it;
+      auto [dst, res] = *it;
+      auto [src, ty] = res;
 
       if (!copy.count(src)) {
-        emitCopy(src, dst);
+        emitCopy(src, dst, ty);
         it = copy.erase(it);
         mark_changed;
       } else
@@ -92,23 +93,27 @@ void DestroyPhi::lowerPhi(Block *bb) {
 
     // Now the ones in `copy` form cycles.
     while (!copy.empty()) {
-      auto [start, _] = *copy.begin();
-      std::vector<Reg> cycle;
+      auto [start, result] = *copy.begin();
+      std::vector<std::pair<Reg, const Type*>> cycle;
       Reg cur = start;
+      const Type *ty = result.second;
       do {
-        cycle.push_back(cur);
-        cur = copy[cur];
+        cycle.emplace_back(cur, ty);
+        auto [c, t] = copy[cur];
+        cur = c; ty = t;
       } while (cur != start);
 
       // Remove the cycle with the scratch register.
-      emitCopy(copy[start], scratch);
-      for (int i = (int)cycle.size() - 1; i > 0; --i)
-        emitCopy(copy[cycle[i]], cycle[i]);
-      emitCopy(scratch, start);
+      emitCopy(copy[start].first, scratch, ty);
+      for (int i = (int) cycle.size() - 1; i > 0; --i) {
+        auto [dst, ty] = cycle[i];
+        emitCopy(copy[dst].first, dst, ty);
+      }
+      emitCopy(scratch, start, ty);
 
       // Delete the cycle from the registers.
       for (auto r : cycle)
-        copy.erase(r);
+        copy.erase(r.first);
     }
   }
 
@@ -116,7 +121,7 @@ void DestroyPhi::lowerPhi(Block *bb) {
   Builder builder;
   for (auto phi : phis) {
     builder.setBefore(phi);
-    auto rd = createAssignedRd(builder, assignment[phi->ret()]);
+    auto rd = createAssignedRd(builder, assignment[phi->ret()], phi->ret()->type);
     phi->ret()->replaceAllUsesWith(rd->ret());
     phi->erase();
   }

@@ -352,7 +352,7 @@ void CodeGen::emitStmt(ASTNode *node) {
     auto baseTy = convert(arrTy->base);
     auto arr = cast<ConstArrayNode>(decl->init);
     auto global = builder.create<GlobalArrayOp>(baseTy);
-    globals[decl->name] = global->ret();
+    globals[global->name = decl->name] = global->ret();
 
     if (baseTy != f32) {
       std::vector<int> r;

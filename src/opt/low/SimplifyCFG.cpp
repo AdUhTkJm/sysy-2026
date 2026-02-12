@@ -2,28 +2,37 @@
 
 namespace opt {
 
+static void rewire(Block *modif, Block *before, Block *after) {
+  for (auto op : *modif) {
+    auto phi = dyn_cast<PhiOp>(op);
+    if (!phi)
+      break;
+
+    phi->replaceIncoming(before, after);
+  }
+}
+
 declare_local_pass(SimplifyCFG,
   void removeDeadBlocks(FuncOp *op);
 ) {
   // Merge jumps when possible.
   auto region = func->getRegion();
   fixed(for (auto bb : *region) {
+    if (bb->getNumOps() != 1)
+      continue;
+
     auto last = dyn_cast<BOp>(bb->getLastOp());
     if (!last)
       continue;
 
-    auto target = last->target;
-    if (target->getNumOps() != 1)
-      continue;
-
-    auto b = dyn_cast<BOp>(target->getFirstOp());
-    if (!b)
-      continue;
-
-    last->target = b->target;
-    mark_changed;
+    for (auto x : *region) {
+      auto l = x->getLastOp();
+      if (auto p = targetOf(l); p == bb)
+        setTarget(l, last->target), rewire(last->target, bb, x), mark_changed;
+      if (auto p = elseOf(l); p == bb)
+        setElse(l, last->target), rewire(last->target, bb, x), mark_changed;
+    }
   })
-
   removeDeadBlocks(func);
 }
 

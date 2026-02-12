@@ -1,6 +1,7 @@
 #include "Pass.h"
 #include "../main/Options.h"
 #include "../ir/Printer.h"
+#include "../ir/Interpreter.h"
 
 using namespace ir;
 
@@ -38,6 +39,13 @@ void PassManager::run() {
 
     if (options.printAll || !strcmp_nocase(options.printAfter.c_str(), pass->name()))
       std::cout << module;
+
+    if (options.interpret) {
+      Interpreter interp;
+      ExecResult res = interp.execute(module);
+      assert(res.values.size() == 1 && res.kind == ExecResult::Return);
+      std::cout << res.values[0].vi << "\n";
+    }
   }
 }
 

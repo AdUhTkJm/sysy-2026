@@ -36,6 +36,9 @@ while [[ $# -gt 0 ]] do
     fi
     asm=$2
     shift 2;;
+  -i|--interpret)
+    interpret=1
+    shift;;
   -x|--execute)
     if [[ -z $output ]]; then
       output=temp/a.s
@@ -125,6 +128,9 @@ if [[ -n $testcase ]]; then
   fi
   if [[ -n $printall ]]; then
     cmd="$cmd --print-all"
+  fi
+  if [[ -n $interpret ]]; then
+    cmd="$cmd --interpret"
   fi
   eval "ASAN_OPTIONS=detect_leaks=0 $cmd"
   check $? "hcc"

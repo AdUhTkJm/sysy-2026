@@ -17,6 +17,7 @@ struct Options {
   option verify;
   option printType;
   option printAll;
+  option interpret;
 
   option optEnd;
 
@@ -25,7 +26,7 @@ struct Options {
   std::string printAfter;
   std::string printBefore;
   std::string compareWith;
-  std::string simulateInput;
+  std::string interpretInput;
   
   Options();
 } extern options;

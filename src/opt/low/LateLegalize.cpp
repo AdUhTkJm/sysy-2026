@@ -6,7 +6,7 @@ using namespace match;
 
 namespace opt {
 
-static int asmSize(AllocaOp *op) {
+int asmSize(const AllocaOp *op) {
   auto sz = asmSize(op->ret()->type->pointee());
   if (auto dim = op->get<DimAttr>())
     sz *= dim->size();
@@ -123,8 +123,8 @@ void LateLegalize::relocateAlloca(FuncOp *func) {
 
   int total = 0;
   Builder builder;
-  builder.setToStart(region);
   for (auto alloca : allocas) {
+    builder.setToStart(region);
     int sz = asmSize(alloca);
 
     // This alloca is equivalently `sp + total`.
@@ -172,8 +172,30 @@ void LateLegalize::relocateAlloca(FuncOp *func) {
     for (auto &rule : rules) {
       if (rule.rewrite(op)) {
         mark_changed;
-        break;
+        return;
       }
+    }
+
+    // Also fold stp and ldp. They can't be captured by rules,
+    // since `stp` would have operands >= 3 and `ldp` has 2 results.
+    if (auto stp = dyn_cast<StpOp>(op)) {
+      auto addr = dyn_cast<AddXIOp>(op->val()->def);
+      if (!addr)
+        return;
+
+      op->setOperand(0, addr->val());
+      stp->value += addr->value;
+      return;
+    }
+
+    if (auto ldp = dyn_cast<LdpOp>(op)) {
+      auto addr = dyn_cast<AddXIOp>(op->val()->def);
+      if (!addr)
+        return;
+
+      op->setOperand(0, addr->val());
+      ldp->value += addr->value;
+      return;
     }
   });)
 }

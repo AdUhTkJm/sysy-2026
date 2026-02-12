@@ -52,22 +52,52 @@ ModuleOp *Builder::createModule() {
 #define caseof(Ty) case (int) OpKind::Ty:
 #define basecopy(Ty) create<Ty>(op->getResultTypes())->with(op->getOperands())
 #define clone_empty(Ty) \
-  caseof(Ty) basecopy(Ty); break;
+  caseof(Ty) { \
+    auto x = basecopy(Ty); \
+    return x; \
+  }
 #define clone_targetful(Ty) \
   caseof(Ty) { \
     auto target = cast<Ty>(op)->target; \
     auto x = basecopy(Ty); \
     x->target = target; \
-    break; \
+    return x; \
   }
+#define clone_branch(Ty) \
+  caseof(Ty) { \
+    auto target = cast<Ty>(op)->target; \
+    auto other = cast<Ty>(op)->other; \
+    auto x = basecopy(Ty); \
+    x->target = target; \
+    x->other = other; \
+    return x; \
+  }
+#define clone_imm(Ty) \
+  caseof(Ty) { \
+    auto value = cast<Ty>(op)->value; \
+    auto x = basecopy(Ty); \
+    x->value = value; \
+    return x; \
+  }
+#define clone_regful(Ty) \
+  caseof(Ty) { \
+    auto reg = cast<Ty>(op)->reg; \
+    auto x = basecopy(Ty); \
+    x->reg = reg; \
+    return x; \
+  }
+#define regful_op_list(X) X(ReadRegOp) X(WriteRegOp)
 
 Op *Builder::clone(Op *op) {
   switch (op->id) {
   empty_op_list(clone_empty)
   targetful_op_list(clone_targetful)
+  branch_op_list(clone_branch)
+  imm_op_list(clone_imm)
+  regful_op_list(clone_regful)
   }
 
-  std::cout << "unknown op kind: " << kindname((OpKind) op->id);
+  std::cerr << "unknown op kind: " << kindname((OpKind) op->id) << "\n";
   assert(false && "cannot get here!");
   return nullptr;
 }
@@ -75,8 +105,12 @@ Op *Builder::clone(Op *op) {
 void Builder::copy(Block *bb, Map &map) {
   for (auto op : *bb) {
     auto cloned = clone(op);
-    for (auto [i, ret] : data::enumerate(cloned->getResults()))
+    for (auto [i, ret] : data::enumerate(cloned->getResults())) {
       map[op->ret(i)] = ret;
+      // Copy assignments, if present.
+      if (auto it = assignment.find(ret); it != assignment.end())
+        assignment[op->ret(i)] = it->second;
+    }
   }
   // Rewire operands.
   for (auto op : *bb) {

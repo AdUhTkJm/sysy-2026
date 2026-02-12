@@ -10,6 +10,8 @@ namespace opt {
 
 int asmSize(const Op *op);
 int asmSize(const Type *ty);
-ReadRegOp *createAssignedRd(Builder &builder, Reg reg);
+int asmSize(const AllocaOp *op);
+
+ReadRegOp *createAssignedRd(Builder &builder, Reg reg, const Type *ty = i64);
 
 }

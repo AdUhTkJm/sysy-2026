@@ -13,10 +13,10 @@ public: \
 #define empty_op_list(X) \
   X(ModuleOp) X(AddIOp) X(SubIOp) X(MulIOp) X(DivIOp) X(ModIOp) \
   X(AndIOp) X(OrIOp) X(XorIOp) X(ReturnOp) X(ForOp) \
-  X(WhileOp) X(IfOp) X(AllocaOp) X(LoadOp) X(StoreOp) \
-  X(ArrayStoreOp) X(ArrayLoadOp) X(CallOp) X(GlobalArrayOp) \
+  X(IfOp) X(AllocaOp) X(LoadOp) X(StoreOp) X(ConditionOp) \
+  X(ArrayStoreOp) X(ArrayLoadOp) X(CallOp) \
   X(GetGlobalOp) X(EqOp) X(NeOp) X(LtOp) X(LeOp) X(NotOp) \
-  X(YieldOp) X(ConditionOp) X(I2FOp) X(F2IOp) X(UndefOp) \
+  X(YieldOp) X(I2FOp) X(F2IOp) X(UndefOp) \
   X(DoWhileOp) X(AddLOp) X(AddFOp) X(SubFOp) X(MulFOp) X(DivFOp) \
   /* ARM operations */ \
   X(AddWOp) X(AddXOp) \
@@ -47,7 +47,7 @@ public: \
 
 #define complete_op_list(X) \
   empty_op_list(X) \
-  X(BranchOp) X(JumpOp) X(PhiOp) X(IntOp) \
+  X(BranchOp) X(JumpOp) X(PhiOp) X(IntOp) X(GlobalArrayOp) \
   X(FuncOp) X(FloatOp) X(GlobalOp) X(ExternCallOp) \
   /* ARM operations */ \
   arm_branch_op_list(X) \
@@ -115,6 +115,9 @@ op(FuncOp,
   Value *getArg(unsigned i) const;
 );
 op(GlobalOp,
+  std::string name;
+);
+op(GlobalArrayOp,
   std::string name;
 );
 

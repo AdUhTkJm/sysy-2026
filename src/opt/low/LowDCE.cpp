@@ -5,7 +5,7 @@ namespace opt {
 
 #define removable_op_list(X) \
   X(AddXIOp) X(AddWIOp) X(AddWOp) X(AddLOp) X(AddXOp) X(AddXPOp) X(AdrpOp) \
-  X(CmpEqOp) X(CmpLeOp) X(CmpLtOp) X(CmpNeOp)
+  X(CmpEqOp) X(CmpLeOp) X(CmpLtOp) X(CmpNeOp) X(MovIOp)
 
 #define removable_decl(Ty) isa<Ty>(op) ||
 

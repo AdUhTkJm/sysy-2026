@@ -26,8 +26,8 @@ int asmSize(const Op *op) {
   return base;
 }
 
-ReadRegOp *createAssignedRd(Builder &builder, Reg reg) {
-  auto rd = builder.create<ReadRegOp>(i64);
+ReadRegOp *createAssignedRd(Builder &builder, Reg reg, const Type *ty) {
+  auto rd = builder.create<ReadRegOp>(ty);
   assignment[rd->ret()] = reg;
   rd->reg = reg;
   return rd;
