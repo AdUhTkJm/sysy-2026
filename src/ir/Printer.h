@@ -59,9 +59,10 @@ std::ostream &operator<<(std::ostream &os, const std::vector<T> &vec) {
   }
   return os;
 }
-std::ostream &operator<<(std::ostream &os, Op *op);
-std::ostream &operator<<(std::ostream &os, Block *bb);
-std::ostream &operator<<(std::ostream &os, Region *region);
+std::ostream &operator<<(std::ostream &os, const Op *op);
+std::ostream &operator<<(std::ostream &os, const Block *bb);
+std::ostream &operator<<(std::ostream &os, const Region *region);
+std::ostream &operator<<(std::ostream &os, const Type *type);
 
 }
 

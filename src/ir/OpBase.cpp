@@ -214,6 +214,10 @@ Block *Op::createFirstBlock() {
   return regions[0]->getFirstBlock();
 }
 
+unsigned Op::getOperandIndex(const Value *v) const {
+  return std::find(operands.begin(),operands.end(), v) - operands.begin();
+}
+
 std::vector<const Type*> Op::getResultTypes() const {
   std::vector<const Type*> types;
   types.reserve(results.size());
@@ -230,8 +234,6 @@ void Value::replaceAllUsesWith(Value *other) {
 
       operand = other;
       other->uses.insert(use);
-      if (auto it = assignment.find(this); it != assignment.end())
-        assignment[other] = it->second;
     }
   }
   uses.clear();

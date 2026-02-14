@@ -166,6 +166,7 @@ public:
   const auto &getRegions() const { return regions; }
   const auto &getOperands() const { return operands; }
   const auto &getAttrs() const { return attrs; }
+  unsigned getOperandIndex(const Value *v) const;
 
   Value *val(unsigned i = 0) const { assert(i < operands.size()); return operands[i]; }
   Value *ret(unsigned i = 0) const { assert(i < results.size()); return results[i]; }
@@ -189,7 +190,12 @@ public:
     attrs[name] = attr;
   }
 
-  template<class T, class ...Args> __requires(
+  // This std::enable_if_t is required when `__requires` is compiled to nothing in C++17.
+  template<class T, class ...Args, std::enable_if_t<
+    std::is_base_of_v<Attr, T> &&
+    std::is_constructible_v<T, Args...>,
+    int
+  > = 0> __requires(
     (std::derived_from<T, Attr>) &&
     (std::is_constructible_v<T, Args...>)
   )
@@ -416,6 +422,7 @@ Block *targetOf(Op *op);
 Block *elseOf(Op *op);
 void setTarget(Op *op, Block *bb);
 void setElse(Op *op, Block *bb);
+
 
 using Types = std::vector<const Type*>;
 using Values = std::vector<Value*>;

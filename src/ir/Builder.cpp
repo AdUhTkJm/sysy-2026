@@ -86,15 +86,24 @@ ModuleOp *Builder::createModule() {
     x->reg = reg; \
     return x; \
   }
+#define clone_nameful(Ty) \
+  caseof(Ty) { \
+    auto name = cast<Ty>(op)->name; \
+    auto x = basecopy(Ty); \
+    x->name = name; \
+    return x; \
+  }
+
 #define regful_op_list(X) X(ReadRegOp) X(WriteRegOp)
 
-Op *Builder::clone(Op *op) {
+Op *Builder::cloneImpl(Op *op) {
   switch (op->id) {
   empty_op_list(clone_empty)
   targetful_op_list(clone_targetful)
   branch_op_list(clone_branch)
   imm_op_list(clone_imm)
   regful_op_list(clone_regful)
+  nameful_op_list(clone_nameful)
   }
 
   std::cerr << "unknown op kind: " << kindname((OpKind) op->id) << "\n";
@@ -102,18 +111,46 @@ Op *Builder::clone(Op *op) {
   return nullptr;
 }
 
-void Builder::copy(Block *bb, Map &map) {
-  for (auto op : *bb) {
-    auto cloned = clone(op);
-    for (auto [i, ret] : data::enumerate(cloned->getResults())) {
-      map[op->ret(i)] = ret;
-      // Copy assignments, if present.
-      if (auto it = assignment.find(ret); it != assignment.end())
-        assignment[op->ret(i)] = it->second;
+Op *Builder::clone(Op *op, Map &map) {
+  auto cloned = cloneImpl(op);
+  cloned->attrs = op->attrs;
+
+  for (auto [i, ret] : data::enumerate(cloned->getResults())) {
+    map[op->ret(i)] = ret;
+    // Copy register assignments, if present.
+    if (auto it = assignment.find(ret); it != assignment.end())
+      assignment[op->ret(i)] = it->second;
+  }
+
+  Builder::Guard _(*this);
+  for (auto r : op->getRegions()) {
+    auto region = cloned->appendRegion();
+    region->remove(region->getFirstBlock());
+
+    for (auto bb : *r) {
+      auto newbb = region->appendBlock();
+      setToStart(newbb);
+      copy(bb, map);
     }
   }
-  // Rewire operands.
+
+  return cloned;
+}
+
+Op *Builder::clone(Op *op) {
+  Map map;
+  return clone(op, map);
+}
+
+void Builder::copy(Block *bb, Map &map) {
+  std::vector<Op*> total;
   for (auto op : *bb) {
+    auto cloned = clone(op, map);
+    total.push_back(cloned);
+  }
+
+  // Rewire operands.
+  for (auto op : total) {
     for (unsigned i = 0; i < op->getNumOperands(); i++) {
       auto it = map.find(op->val(i));
       if (it == map.end())

@@ -78,10 +78,10 @@ done
 
 # Rebuild.
 if [[ ! -d $build ]]; then
-  cmake -S . -B build
+  cmake -G Ninja -S . -B build
 fi
 cd build
-make -j$(nproc)
+ninja
 ret=$?
 if [[ $ret -ne 0 ]]; then
   die "compile error: make returned $ret"
@@ -133,11 +133,18 @@ if [[ -n $testcase ]]; then
     cmd="$cmd --interpret"
   fi
   eval "ASAN_OPTIONS=detect_leaks=0 $cmd"
-  check $? "hcc"
+  check $? "hcc"  
+  echo compiled.
   if [[ -n $exec ]]; then
     aarch64-linux-gnu-gcc -x c test/lib.c -x assembler $output -o temp/a.out -static
     check $? "gnu \`as\`"
-    qemu-aarch64-static temp/a.out
-    # rm -f temp/a.out
+    in=/dev/null
+    base=${name/.sy/.in}
+    if [[ -f $base ]]; then
+      in=$base
+    fi
+    qemu-aarch64-static temp/a.out < $in
+    ret=$?
+    echo; echo $ret
   fi
 fi

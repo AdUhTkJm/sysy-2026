@@ -20,6 +20,7 @@ void populate(opt::PassManager &pm) {
   add_pass(EnsureTerminator);
   add_pass(Mem2Reg);
   add_pass(HighDCE);
+  add_pass(PropagateArray);
 
   // Mid-IR passes.
   add_pass(Flatten);

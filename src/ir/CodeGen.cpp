@@ -7,19 +7,24 @@ using namespace data;
 
 namespace ir {
 
-const std::map<std::string, const Type*> CodeGen::external = {
-  { "putint", unit },
-  { "putch", unit },
-  { "putfloat", unit },
-  { "putfarray", unit },
-  { "putarray", unit },
-  { "getint", i32 },
-  { "getch", i32 },
-  { "getarray", i32 },
-  { "getfarray", i32 },
-  { "getfloat", f32 },
-  { "_sysy_starttime", unit },
-  { "_sysy_stoptime", unit },
+// We wrap it around, so that `unit`, `i32` and `f32` is always initialized before this.
+// Global variable initialization order is unpredictable.
+const std::map<std::string, const Type*> &CodeGen::getExternal() {
+  static const std::map<std::string, const Type*> external {
+    { "putint", unit },
+    { "putch", unit },
+    { "putfloat", unit },
+    { "putfarray", unit },
+    { "putarray", unit },
+    { "getint", i32 },
+    { "getch", i32 },
+    { "getarray", i32 },
+    { "getfarray", i32 },
+    { "getfloat", f32 },
+    { "_sysy_starttime", unit },
+    { "_sysy_stoptime", unit },
+  };
+  return external;
 };
 
 static const Type *convert(ast::Type *type) {
@@ -179,7 +184,7 @@ Value *CodeGen::emitExpr(ASTNode *node) {
     if (auto it = table.find(access->array); it == table.end())
       array = getGlobal(access->array);
     else
-      array = it->second;
+      array = builder.create<LoadOp>(it->second->type->pointee())->with(it->second)->ret();
     Values vals { array };
     for (auto x : access->indices)
       vals.push_back(emitExpr(x));
@@ -187,7 +192,7 @@ Value *CodeGen::emitExpr(ASTNode *node) {
   }
 
   if (auto call = dyn_cast<CallNode>(node)) {
-    if (auto it = external.find(call->func); it != external.end()) {
+    if (auto it = getExternal().find(call->func); it != getExternal().end()) {
       Values vals;
       for (auto x : call->args)
         vals.push_back(emitExpr(x));
@@ -252,9 +257,9 @@ void CodeGen::emitStmt(ASTNode *node) {
   if (auto access = dyn_cast<ArrayAssignNode>(node)) {
     Value *array;
     if (auto it = table.find(access->array); it == table.end())
-      assert(globals.count(access->array)), array = globals[access->array];
+      array = getGlobal(access->array);
     else
-      array = it->second;
+      array = builder.create<LoadOp>(it->second->type->pointee())->with(it->second)->ret();
     Values vals { array };
     for (auto x : access->indices)
       vals.push_back(emitExpr(x));
@@ -273,9 +278,9 @@ void CodeGen::emitStmt(ASTNode *node) {
     auto arrTy = dyn_cast<ArrayType>(decl->type);
     auto allocaTy = Type::pointer(convert(arrTy ? arrTy->base : decl->type));
     auto alloca = builder.create<AllocaOp>(allocaTy);
-    table[decl->name] = alloca->ret();
 
     if (!arrTy) {
+      table[decl->name] = alloca->ret();
       if (decl->init) {
         auto init = emitExpr(decl->init);
         builder.create<StoreOp>()->with(alloca->ret(), init);
@@ -286,6 +291,12 @@ void CodeGen::emitStmt(ASTNode *node) {
     // Now deal with arrays.
     // This attribute is mainly for lowering.
     alloca->set<DimAttr>(arrTy->dims);
+    auto ptrAlloca = builder.create<AllocaOp>(Type::pointer(allocaTy));
+
+    // Note that every variable should be stored on stack when emitting;
+    // So this alloca needs another alloca to hold the alloca'ed address.
+    builder.create<StoreOp>()->with(ptrAlloca->ret(), alloca->ret());
+    table[decl->name] = ptrAlloca->ret();
     if (!decl->init)
       return;
 
@@ -293,9 +304,20 @@ void CodeGen::emitStmt(ASTNode *node) {
     if (auto arr = dyn_cast<LocalArrayNode>(decl->init)) {
       auto arrTy = cast<ArrayType>(node->type);
       for (auto i = 0, e = arrTy->getSize(); i < e; i++) {
-        if (!arr->va[i])
-          continue;
-        auto value = emitExpr(arr->va[i]);
+        Value *value;
+        if (arr->va[i])
+          value = emitExpr(arr->va[i]);
+        else if (isa<IntType>(arrTy->base)) {
+          auto op = builder.create<IntOp>(i32);
+          op->value = 0;
+          value = op->ret();
+        } else {
+          assert(isa<FloatType>(arrTy->base));
+          auto op = builder.create<FloatOp>(f32);
+          op->value = 0;
+          value = op->ret();
+        }
+
         // Find indices of this `i`.
         Values indices { alloca->ret() };
         indices.reserve(arrTy->dims.size() + 2);
@@ -304,6 +326,7 @@ void CodeGen::emitStmt(ASTNode *node) {
           indices.push_back(builder.createInt(j % dim)->ret());
           j /= dim;
         }
+        std::reverse(indices.begin() + 1, indices.end());
         indices.push_back(value);
         builder.create<ArrayStoreOp>()->with(indices);
       }
@@ -320,6 +343,7 @@ void CodeGen::emitStmt(ASTNode *node) {
           indices.push_back(builder.createInt(j % dim)->ret());
           j /= dim;
         }
+        std::reverse(indices.begin() + 1, indices.end());
         Op *op = isa<FloatType>(arrTy->base)
           ? (Op*) builder.createFloat(arr->vf[i])
           : builder.createInt(arr->vi[i]);
@@ -351,8 +375,9 @@ void CodeGen::emitStmt(ASTNode *node) {
     }
     auto baseTy = convert(arrTy->base);
     auto arr = cast<ConstArrayNode>(decl->init);
-    auto global = builder.create<GlobalArrayOp>(baseTy);
+    auto global = builder.create<GlobalOp>(baseTy);
     globals[global->name = decl->name] = global->ret();
+    global->set<DimAttr>(arrTy->dims);
 
     if (baseTy != f32) {
       std::vector<int> r;
@@ -428,6 +453,9 @@ void CodeGen::emitStmt(ASTNode *node) {
     builder.create<ConditionOp>()->with(cond);
     return;
   }
+
+  if (isa<EmptyNode>(node))
+    return;
 
   emitExpr(node);
 }

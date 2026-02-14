@@ -32,9 +32,11 @@ void printWithFormat(std::ostream &os, const Op *op, Printer *printer, const cha
     }
 
     p++;
-    switch (*p++) {
+    auto c = *p++;
+    switch (c) {
     // Operands.
-    case 'x': {
+    case 'x':
+    case 'X': {
       if (*p == '>') {
         p++;
         printer->printOperands(os, op, *p++ - '0');
@@ -46,7 +48,10 @@ void printWithFormat(std::ostream &os, const Op *op, Printer *printer, const cha
         if (op->getNumOperands() <= (unsigned) index)
           break;
       }
-      os << printer->str(op->val(index));
+      auto str = printer->str(op->val(index));
+      if (c == 'X' && str[0] == 'w')
+        str[0] = 'x';
+      os << str;
       break;
     }
     // Results.
@@ -60,8 +65,10 @@ void printWithFormat(std::ostream &os, const Op *op, Printer *printer, const cha
           p += 3;
         break;
       }
-      Value *v = op->ret(*p++ - '0');
-      os << printer->str(v);
+      auto str = printer->str(op->ret(*p++ - '0'));
+      if (c == 'R' && str[0] == 'w')
+        str[0] = 'x';
+      os << str;
       break;
     }
     case 't': {
@@ -73,6 +80,7 @@ void printWithFormat(std::ostream &os, const Op *op, Printer *printer, const cha
       break;
     }
     default:
+      std::cout << "format str: " << fmt << "\n";
       assert(false && "invalid format string");
     }
   }
@@ -166,7 +174,6 @@ format(LoadOp, "$r0 = load $x0");
 format(StoreOp, "store [$x0], $x1");
 format(CallOp, "$r0 = $x0($x>1)");
 format(GetGlobalOp, "$r0 = la $x0");
-format(GlobalArrayOp, "$r0: $tr0");
 format(YieldOp, "yield $x>0");
 format(ConditionOp, "condition($x0); $x>1");
 format(I2FOp, "$r0 = (f32) $x0");
@@ -176,12 +183,15 @@ format(DoWhileOp, "$r>0 = do-while $x>0");
 /* ARM operations */
 format(AddWOp, "add $r0, $x0, $x1");
 format(AddXOp, "add $R0, $X0, $X1");
+format(MaddWOp, "madd $r0, $x0, $x1, $x2");
+format(MsubWOp, "msub $r0, $x0, $x1, $x2");
 format(SubWOp, "sub $r0, $x0, $x1");
 format(SubXOp, "sub $R0, $X0, $X1");
 format(MulWOp, "mul $r0, $x0, $x1");
 format(MulXOp, "mul $R0, $X0, $X1");
 format(DivWOp, "sdiv $r0, $x0, $x1");
 format(DivXOp, "sdiv $R0, $X0, $X1");
+format(EorWOp, "eor $r0, $x0, $x1");
 format(CmpEqOp, "cmp $x0, $x1\ncset $r0, eq");
 format(CmpNeOp, "cmp $x0, $x1\ncset $r0, ne");
 format(CmpLtOp, "cmp $x0, $x1\ncset $r0, lt");
@@ -196,6 +206,11 @@ printer(AddWIOp) {
 printer(AddXIOp) {
   auto addwi = cast<AddXIOp>(op);
   os << "add " << printer->str(op->ret()) << ", " << printer->str(op->val()) << ", #" << addwi->value;
+}
+
+printer(EorWIOp) {
+  auto eor = cast<EorWIOp>(op);
+  os << "eor " << printer->str(op->ret()) << ", " << printer->str(op->val()) << ", #" << eor->value;
 }
 
 printer(MovIOp) {
@@ -553,21 +568,26 @@ void Printer::dump(std::ostream &out) {
   os.clear();
 }
 
-std::ostream &operator<<(std::ostream &os, Op *op) {
+std::ostream &operator<<(std::ostream &os, const Op *op) {
   printer.print(op);
   printer.dump(os);
   return os;
 }
 
-std::ostream &operator<<(std::ostream &os, Block *bb) {
+std::ostream &operator<<(std::ostream &os, const Block *bb) {
   printer.print(bb);
   printer.dump(os);
   return os;
 }
 
-std::ostream &operator<<(std::ostream &os, Region *region) {
+std::ostream &operator<<(std::ostream &os, const Region *region) {
   printer.print(region);
   printer.dump(os);
+  return os;
+}
+
+std::ostream &operator<<(std::ostream &os, const Type *type) {
+  printer.printType(os, type);
   return os;
 }
 

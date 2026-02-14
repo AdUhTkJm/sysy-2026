@@ -13,7 +13,9 @@ add_executable(hcc ${SRC_FILES})
 
 target_compile_options(hcc PRIVATE
   -Wall -Wextra -Wpedantic -Wno-gnu-anonymous-struct -Wno-nested-anon-types
-  -fno-exceptions -fno-rtti -fsanitize=undefined,address -g
+  -Wno-variadic-macro-arguments-omitted
+  -fno-exceptions -fno-rtti -fdiagnostics-color=always -fsanitize=undefined,address
+  -g -std=c++17
 )
 target_link_options(hcc PRIVATE
   -fsanitize=undefined,address

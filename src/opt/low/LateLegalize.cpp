@@ -42,9 +42,6 @@ declare_local_pass(LateLegalize,
   void prologue(FuncOp *func);
   void relocateAlloca(FuncOp *func);
   void rewriteJumps(Block *bb);
-  void cleanup();
-
-  std::vector<Op*> clean;
 ) {
   prologue(func);
   relocateAlloca(func);
@@ -52,8 +49,6 @@ declare_local_pass(LateLegalize,
   auto region = func->getRegion();
   for (auto bb : *region)
     rewriteJumps(bb);
-
-  cleanup();
 }
 
 void LateLegalize::prologue(FuncOp *func) {
@@ -67,7 +62,7 @@ void LateLegalize::prologue(FuncOp *func) {
   });
   std::vector<Reg> ints, floats;
   for (auto x : values) {
-    if (!calleeSaved.contains(x))
+    if (!calleeSaved.count(x))
       continue;
     (regbank(x) == FP ? floats : ints).push_back(x);
   }
@@ -112,6 +107,20 @@ void LateLegalize::prologue(FuncOp *func) {
   }
 }
 
+#define check_alloca \
+  auto base = baseOf(op->val()); \
+  if (!base) \
+    return; \
+  auto alloca = dyn_cast<AllocaOp>(base); \
+  if (!alloca) \
+    return; \
+
+#define relocate_fold(Ty) \
+  if (auto x = dyn_cast<Ty>(op)) { \
+    check_alloca \
+    x->value += offsets[alloca]; \
+  }
+
 void LateLegalize::relocateAlloca(FuncOp *func) {
   auto allocas = collectOps<AllocaOp>(func);
   auto region = func->getRegion();
@@ -122,22 +131,23 @@ void LateLegalize::relocateAlloca(FuncOp *func) {
   });
 
   int total = 0;
+  std::map<AllocaOp*, int> offsets;
+  std::vector<Op*> clean;
+
   Builder builder;
+  builder.setToStart(region);
+  auto rd = createAssignedRd(builder, sp);
+  // Sort by alloca size, smallest first.
+  std::sort(allocas.begin(), allocas.end(), [](AllocaOp *l, AllocaOp *r) {
+    return asmSize(l) < asmSize(r);
+  });
   for (auto alloca : allocas) {
-    builder.setToStart(region);
     int sz = asmSize(alloca);
 
     // This alloca is equivalently `sp + total`.
-    auto rd = createAssignedRd(builder, sp);
-    auto add = builder.create<AddXIOp>(i64)->with(rd->ret());
-    add->value = total;
-    // This should always have been combined.
-    // If it isn't, then it's always `add sp, sp, #0` and is hence `sp`.
-    assignment[add->ret()] = sp;
-    clean.push_back(add);
-
-    alloca->ret()->replaceAllUsesWith(add->ret());
-    alloca->erase();
+    // But we have to round it up to a multiple of `sz`.
+    offsets[alloca] = (total + sz - 1) / sz * sz;
+    clean.push_back(alloca);
 
     total += sz;
   }
@@ -167,37 +177,29 @@ void LateLegalize::relocateAlloca(FuncOp *func) {
     wr->reg = sp;
   }
 
-  // Try to fold the extra addition we've just introduced.
+  // Fold the extra addition we've just introduced.
+  // An alloca can only be used for loads, stores or passed as argument to some other function.
+  // The final possibility is already lowered to `WriteRegOp`, so we must also check that.
   fixed(walk<Postorder>(func, [&](Op *op) {
-    for (auto &rule : rules) {
-      if (rule.rewrite(op)) {
-        mark_changed;
-        return;
-      }
-    }
+    arm_mem_op_list(relocate_fold)
 
-    // Also fold stp and ldp. They can't be captured by rules,
-    // since `stp` would have operands >= 3 and `ldp` has 2 results.
-    if (auto stp = dyn_cast<StpOp>(op)) {
-      auto addr = dyn_cast<AddXIOp>(op->val()->def);
-      if (!addr)
-        return;
+    if (auto x = dyn_cast<WriteRegOp>(op)) {
+      check_alloca
+      builder.setBefore(op);
 
-      op->setOperand(0, addr->val());
-      stp->value += addr->value;
-      return;
-    }
+      auto add = builder.create<AddXIOp>(i64)->with(rd->ret());
+      add->value = offsets[alloca];
+      assignment[add->ret()] = (Reg) x->reg;
 
-    if (auto ldp = dyn_cast<LdpOp>(op)) {
-      auto addr = dyn_cast<AddXIOp>(op->val()->def);
-      if (!addr)
-        return;
-
-      op->setOperand(0, addr->val());
-      ldp->value += addr->value;
+      x->erase();
       return;
     }
   });)
+
+  for (auto alloca : clean) {
+    alloca->ret()->replaceAllUsesWith(rd->ret());
+    alloca->erase();
+  }
 }
 
 void LateLegalize::rewriteJumps(Block *bb) {
@@ -233,16 +235,6 @@ void LateLegalize::rewriteJumps(Block *bb) {
   builder.setAfter(op);
   setElse(op, nullptr);
   builder.create<BOp>()->target = other;
-}
-
-void LateLegalize::cleanup() {
-  for (auto op : clean) {
-    if (std::all_of(op->getResults().begin(), op->getResults().end(), [](Value *v){
-      return !v->used();
-    }))
-      op->erase();
-  }
-  clean.clear();
 }
 
 }

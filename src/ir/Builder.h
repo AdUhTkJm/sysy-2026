@@ -25,6 +25,8 @@ class Builder {
       result->replaceAllUsesWith(t->ret(i));
     other->erase();
   }
+
+  Op *cloneImpl(Op *);
 public:
   class Guard {
     Builder &builder;
@@ -96,7 +98,8 @@ public:
   }
 
   void copy(Block *bb, Map &map);
-  Op *clone(Op *);
+  Op *clone(Op *op);
+  Op *clone(Op *op, Map &map);
 
   IntOp *createInt(int i);
   FloatOp *createFloat(float f);

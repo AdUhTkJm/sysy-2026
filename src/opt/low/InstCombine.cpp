@@ -7,12 +7,16 @@ namespace opt {
 
 Pass *makeHighDCE(ir::ModuleOp *module);
 
-#define pred [](const Env &env)
+#define pred [](const Env &env) -> bool
+#define imm(x) env.imms.at(x)
 
 static Rule rules[] = {
   Rule("(addw x (movi 'a))") >> "(addwi:i32 x 'a)",
-  Rule("(addwi x 'a)") >> "x" & pred { return env.imms.at("'a") == 0; },
-  Rule("(addxi x 'a)") >> "x" & pred { return env.imms.at("'a") == 0; },
+  Rule("(addx x (movi 'a))") >> "(addxi:i32 x 'a)",
+  Rule("(mulw x (movi 'a))") >> "x" & pred { return imm("'a") == 1; },
+  Rule("(mulw (movi 'a) (movi 'b))") >> "(movi:i32 (!mul 'a 'b))",
+  Rule("(addwi x 'a)") >> "x" & pred { return imm("'a") == 0; },
+  Rule("(addxi x 'a)") >> "x" & pred { return imm("'a") == 0; },
   Rule("(str (addxi base 'a) val 'b)") >> "(str base val (!add 'a 'b))",
   Rule("(ldr:T (addxi base 'a) 'b)") >> "(ldr:T base (!add 'a 'b))",
 };

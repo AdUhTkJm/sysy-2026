@@ -168,6 +168,7 @@ public:
 
   ConstArrayNode(int *vi): vi(vi), isFloat(false) {}
   ConstArrayNode(float *vf): vf(vf), isFloat(true) {}
+  ~ConstArrayNode() { if (isFloat) delete[] vf; else delete[] vi; }
 };
 
 class LocalArrayNode : public ASTNodeImpl<LocalArrayNode, __LINE__> {
@@ -175,6 +176,7 @@ public:
   ASTNode **va;
 
   LocalArrayNode(ASTNode **va): va(va) {}
+  ~LocalArrayNode() { delete[] va; }
 };
 
 class ArrayAccessNode : public ASTNodeImpl<ArrayAccessNode, __LINE__> {

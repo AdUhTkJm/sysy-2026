@@ -12,8 +12,8 @@ class CodeGen {
   Builder builder;
   ModuleOp *module;
 
-  static constexpr std::string constructor = "__init";
-  static const std::map<std::string, const Type *> external;
+  static constexpr const char *constructor = "__init";
+  static const std::map<std::string, const Type *> &getExternal();
 
   Value *getGlobal(const std::string &name);
 public:

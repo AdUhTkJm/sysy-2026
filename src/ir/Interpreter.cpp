@@ -94,11 +94,6 @@ executor(ModuleOp) {
       interp.addGlobal(g->ret(), opt::asmSize(g));
       continue;
     }
-
-    if (auto g = dyn_cast<GlobalArrayOp>(x)) {
-      interp.addGlobal(g->ret(), opt::asmSize(g));
-      continue;
-    }
   }
 
   // Execute the main function in the module.
@@ -350,7 +345,7 @@ executor(AddXIOp) {
 }
 
 std::unordered_map<OpKind, Interpreter::OpHandler> Interpreter::handlers {
-  complete_op_list(executor_decl)
+  // complete_op_list(executor_decl)
 };
 
 RuntimeValue &Interpreter::operator[](Value *v) {

@@ -17,7 +17,7 @@ class Pass {
 protected:
 private:
   template<class F>
-  void walkImpl(ir::Op *parent, const F &f, Preorder) {
+  void walkImpl(ir::Op *parent, const F &f, Preorder) const {
     f(parent);
     for (auto r : parent->getRegions()) {
       for (auto bb : *r) {
@@ -31,7 +31,7 @@ private:
   }
 
   template<class F>
-  void walkImpl(ir::Op *parent, const F &f, Postorder) {
+  void walkImpl(ir::Op *parent, const F &f, Postorder) const {
     for (auto r : parent->getRegions()) {
       for (auto bb : *r) {
         for (auto it = bb->begin(); it != bb->end();) {
@@ -45,7 +45,7 @@ private:
   }
 
   template<class T, class F> __requires(walk_order<T>)
-  void walkImpl(ir::Op *parent, const F &f) {
+  void walkImpl(ir::Op *parent, const F &f) const {
     walkImpl(parent, f, T{});
   }
 protected:
@@ -53,7 +53,7 @@ protected:
   std::vector<ir::FuncOp*> collectFunctions();
 
   template<class T>
-  std::vector<T*> collectOps(ir::Op *root) {
+  std::vector<T*> collectOps(ir::Op *root) const {
     std::vector<T*> result;
     walk(root, [&](ir::Op *op) {
       if (auto x = dyn_cast<T>(op))
@@ -64,7 +64,7 @@ protected:
 
   template<class T>
   // Note: this only traverses a single layer.
-  std::vector<T*> collectOps(ir::Block *bb) {
+  std::vector<T*> collectOps(ir::Block *bb) const {
     std::vector<T*> result;
     for (auto op : *bb) {
       if (auto x = dyn_cast<T>(op))
@@ -74,12 +74,19 @@ protected:
   }
 
   template<class T>
-  std::vector<T*> collectOps() { return collectOps<T>(module); }
+  std::vector<T*> collectOps() const { return collectOps<T>(module); }
 
   template<class T = Preorder, class F> __requires((std::invocable<F, ir::Op*>) && walk_order<T>)
-  void walk(ir::Op *parent, const F &f) {
+  void walk(ir::Op *parent, const F &f) const {
     walkImpl<T>(parent, f);
   }
+
+  ir::GlobalOp *findGlobal(std::string_view name) const;
+
+  // Returns the base of the address that the operation accesses.
+  // This can be either a function argument, a GlobalOp or an alloca.
+  ir::Op *directBaseOf(ir::Op *op) const;
+  ir::Op *baseOf(ir::Value *v) const;
 public:
   virtual void run() = 0;
   virtual const char *name() = 0;

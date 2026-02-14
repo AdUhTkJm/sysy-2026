@@ -32,11 +32,24 @@ declare_pass(Print) {
     os << "\n";
   }
 
-  os << ".bss\n";
   for_all(GlobalOp) {
-    os << ".align 3\n";
-    os << op->name << ":\n";
-    os << "  .zero " << asmSize(op) << "\n";
+    if (auto iarr = op->get<ConstIArrAttr>()) {
+      os << (iarr->allZeroes() ? ".bss\n" : ".data\n");
+      os << ".align 3\n";
+      os << op->name << ":\n";
+      if (iarr->allZeroes())
+        os << "  .zero " << asmSize(op) << "\n";
+      else {
+        os << "  .int " << iarr->value[0];
+        for (unsigned i = 1; i < iarr->value.size(); i++)
+          os << ", " << iarr->value[i];
+        os << "\n";
+      }
+    } else {
+      os << ".bss\n.align 3\n";
+      os << op->name << ":\n";
+      os << "  .zero " << asmSize(op) << "\n";
+    }
   }
 }
 

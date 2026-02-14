@@ -53,4 +53,51 @@ void PassManager::addPass(Pass *pass) {
   passes.push_back(pass);
 }
 
+GlobalOp *Pass::findGlobal(std::string_view name) const {
+  for_all(GlobalOp) {
+    if (op->name == name)
+      return op;
+  }
+
+  return nullptr;
+}
+
+Op *Pass::directBaseOf(Op *op) const {
+  if (isa<AllocaOp>(op))
+    return op;
+
+  if (isa<GetGlobalOp>(op))
+    return op->val()->def;
+
+  assert(false && "there is no base!");
+  return nullptr;
+}
+
+Op *Pass::baseOf(Value *v) const {
+  auto op = v->def;
+  if (!op)
+    return nullptr;
+
+  if (isa<AllocaOp>(op) || isa<FuncOp>(op))
+    return op;
+
+  if (isa<GetGlobalOp>(op))
+    return op->val()->def;
+
+  if (isa<AddXOp>(op)) {
+    if (auto k = baseOf(op->val(0)))
+      return k;
+    
+    return baseOf(op->val(1));
+  }
+
+  if (auto addxp = dyn_cast<AddXPOp>(op))
+    return findGlobal(addxp->name);
+
+  if (isa<FuncOp>(op))
+    return op;
+  
+  return nullptr;
+}
+
 }

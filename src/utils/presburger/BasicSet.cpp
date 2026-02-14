@@ -14,9 +14,9 @@ bool BasicSet::empty() {
   for (;;) {
     // Choose a variable to evict from base.
     // We typically choose the x_r with minimal b_r.
-    auto row = -1;
-    auto min = 0;
-    for (int i = 0; i < tableau.size(); ++i) {
+    unsigned row = -1u;
+    int min = 0;
+    for (unsigned i = 0; i < tableau.size(); ++i) {
       if (tableau[i].back() < min) {
         row = i;
         min = tableau[i].back();
@@ -25,7 +25,7 @@ bool BasicSet::empty() {
 
     // Now every element in `b` is non-negative.
     // We've found a feasible solution.
-    if (row == -1)
+    if (row == -1u)
       return false;
 
     // We need to find a variable to put autoo the base, whose value has to be positive.
@@ -34,7 +34,7 @@ bool BasicSet::empty() {
     // Instead, we'll choose the first one encountered.
     auto col = -1;
     // Don't take `b_r` autoo account. That column (1) can't be pivoted.
-    for (int j = 0; j < tableau[row].size() - 1; ++j) {
+    for (unsigned j = 0; j < tableau[row].size() - 1; ++j) {
       if (tableau[row][j] < 0) {
         col = j;
         break;
@@ -47,7 +47,6 @@ bool BasicSet::empty() {
 
     // Pivot.
     auto pivot = tableau[row][col];
-    auto width = tableau[row].size();
 
     // Normalize the pivot row.
     // We would write:
@@ -63,7 +62,7 @@ bool BasicSet::empty() {
     denom[row] *= pivot;
 
     // Eliminate pivot column in all other rows.
-    for (int i = 0; i < tableau.size(); ++i) {
+    for (unsigned i = 0; i < tableau.size(); ++i) {
       if (i == row)
         continue;
 
@@ -83,12 +82,12 @@ bool BasicSet::empty() {
       // So we just update according to that.
 
       denom[i] *= denom[row];
-      for (auto j = 0; j < tableau[0].size(); ++j)
+      for (unsigned j = 0; j < tableau[0].size(); ++j)
         tableau[i][j] = tableau[i][j] * denom[row] - tableau[i][col] * tableau[row][j];
     }
 
     // Calculate GCD to make numbers smaller.
-    for (int i = 0; i < tableau.size(); i++) {
+    for (unsigned i = 0; i < tableau.size(); i++) {
       auto &row = tableau[i];
       auto &de = denom[i];
 

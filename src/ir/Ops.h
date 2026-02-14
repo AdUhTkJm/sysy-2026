@@ -19,10 +19,10 @@ public: \
   X(YieldOp) X(I2FOp) X(F2IOp) X(UndefOp) \
   X(DoWhileOp) X(AddLOp) X(AddFOp) X(SubFOp) X(MulFOp) X(DivFOp) \
   /* ARM operations */ \
-  X(AddWOp) X(AddXOp) \
+  X(AddWOp) X(AddXOp) X(MaddWOp) X(MsubWOp) \
   X(SubWOp) X(SubXOp) X(MulWOp) X(MulXOp) \
-  X(DivWOp) X(DivXOp) X(CmpEqOp) X(CmpNeOp) X(CmpLtOp) X(CmpLeOp) \
-  X(RetOp)
+  X(DivWOp) X(DivXOp) X(CmpEqOp) X(CmpNeOp) X(CmpLtOp) X(CmpLeOp)  \
+  X(RetOp) X(EorWOp) \
 
 #define arm_branch_op_list(X) \
   X(BeqOp) X(BneOp) X(BltOp) X(BleOp) X(CbzOp) X(CbnzOp) X(BgeOp) X(BgtOp)
@@ -39,15 +39,22 @@ public: \
   X(JumpOp)
 
 #define arm_imm_op_list(X) \
-  X(AddWIOp) X(AddXIOp) X(MovIOp) X(LdrOp) X(StrOp) X(LdpOp) X(StpOp) 
+  X(AddWIOp) X(AddXIOp) X(MovIOp) X(LdrOp) X(StrOp) X(LdpOp) X(StpOp) \
+  X(EorWIOp)
+
+#define arm_mem_op_list(X) \
+  X(LdrOp) X(StrOp) X(LdpOp) X(StpOp)
 
 #define imm_op_list(X) \
   arm_imm_op_list(X) \
   X(IntOp)
 
+#define nameful_op_list(X) \
+  X(FuncOp) X(GlobalOp) X(AddXPOp) X(AdrpOp) X(BlOp) X(ExternCallOp)
+
 #define complete_op_list(X) \
   empty_op_list(X) \
-  X(BranchOp) X(JumpOp) X(PhiOp) X(IntOp) X(GlobalArrayOp) \
+  X(BranchOp) X(JumpOp) X(PhiOp) X(IntOp) \
   X(FuncOp) X(FloatOp) X(GlobalOp) X(ExternCallOp) \
   /* ARM operations */ \
   arm_branch_op_list(X) \
@@ -56,14 +63,14 @@ public: \
 
 #define impure_op_list(X) \
   X(ExternCallOp) X(BranchOp) X(JumpOp) X(YieldOp) X(ConditionOp) \
-  X(StoreOp) X(CallOp) X(GlobalArrayOp) X(GlobalOp) X(ReturnOp) \
+  X(StoreOp) X(CallOp) X(ArrayStoreOp) X(GlobalOp) X(ReturnOp) \
   /* ARM operations */ \
   arm_branch_op_list(X) \
   X(StrOp) X(StpOp) X(BOp) X(BlOp) X(RetOp)
 
 #define targetful_op(Ty, ...) \
   op(Ty, \
-    Block *target; \
+    Block *target = nullptr; \
     Block *&getTarget() { return target; } \
     Block *getTarget() const { return target; } \
     __VA_ARGS__ \
@@ -71,7 +78,7 @@ public: \
 
 #define branch_op(Ty, ...) \
   targetful_op(Ty, \
-    Block *other; \
+    Block *other = nullptr; \
     Block *&getOther() { return target; } \
     Block *getOther() const { return target; } \
     __VA_ARGS__ \
@@ -79,7 +86,7 @@ public: \
 
 #define imm_op(Ty, ...) \
   op(Ty, \
-    int value; \
+    int value = 0; \
     int &getValue() { return value; } \
     int getValue() const { return value; } \
     __VA_ARGS__ \
@@ -100,7 +107,7 @@ branch_op_list(branch_op)
 imm_op_list(imm_op)
 
 op(FloatOp,
-  float value;
+  float value = 0;
 );
 op(ExternCallOp,
   std::string name;
@@ -115,9 +122,6 @@ op(FuncOp,
   Value *getArg(unsigned i) const;
 );
 op(GlobalOp,
-  std::string name;
-);
-op(GlobalArrayOp,
   std::string name;
 );
 
