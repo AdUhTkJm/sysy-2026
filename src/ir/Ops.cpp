@@ -52,6 +52,10 @@ void PhiOp::replaceIncoming(Block *bb, Block *after) {
 bool hasSideEffect(Op *op) {
   return (impure_op_list(isa) false);
 }
+
+bool isTerminator(Op *op) {
+  return (terminator_list(isa) false);
+}
 #undef isa
 
 // Takes `AddIOp` to `addi`.

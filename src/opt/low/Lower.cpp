@@ -9,21 +9,10 @@ namespace opt {
 declare_pass(Lower,
   void runImpl(FuncOp *func);
   std::vector<int> getDim(Value *addr) const;
-
-  bool hasInit = false;
-  FuncOp *main = nullptr;
 ) {
   printer.setBlockPrefix(".L");
   for (auto x : collectFunctions())
     runImpl(x);
-
-  if (hasInit) {
-    assert(main && "main function must exist");
-    Builder builder;
-    builder.setToStart(main->getRegion());
-    auto call = builder.create<BlOp>(unit);
-    call->name = "__init";
-  }
 }
 
 std::vector<int> Lower::getDim(Value *addr) const {
@@ -179,11 +168,6 @@ void Lower::runImpl(FuncOp *func) {
   }
   for (unsigned i = func->getNumResults() - 1; i > 0; i--)
     func->removeResult(i);
-
-  if (func->name == "__init")
-    hasInit = true;
-  if (func->name == "main")
-    main = func;
 };
 
 }

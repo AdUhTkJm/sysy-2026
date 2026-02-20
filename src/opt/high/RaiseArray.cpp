@@ -163,7 +163,7 @@ void RaiseArray::raiseRecursive(FuncOp *func) {
         continue;
 
       builder.setBefore(op);
-      auto zero = builder.create<IntOp>();
+      auto zero = builder.create<IntOp>(i32);
       op->pushOperand(zero->ret());
     }
   }

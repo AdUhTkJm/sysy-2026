@@ -17,6 +17,7 @@ Options options;
 
 void populate(opt::PassManager &pm) {
   // High-IR passes.
+  add_pass(TidyCodeGen);
   add_pass(EnsureTerminator);
   add_pass(Mem2Reg);
   add_pass(HighDCE);
@@ -30,6 +31,7 @@ void populate(opt::PassManager &pm) {
   // Low-IR passes.
   add_pass(Lower);
   add_pass(InstCombine);
+  add_pass(AddressMode);
   add_pass(LowDCE);
   add_pass(SimplifyCFG);
   add_pass(LowerPostSchedule);
@@ -37,7 +39,6 @@ void populate(opt::PassManager &pm) {
   add_pass(DestroyPhi);
   add_pass(SimplifyCFG);
   add_pass(LateLegalize);
-  add_pass(AddressMode);
   add_pass(Print);
 }
 

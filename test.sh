@@ -93,14 +93,19 @@ cd ..
 if [[ -n $asm ]]; then
   aarch64-linux-gnu-gcc -x c test/lib.c -x assembler $asm -o temp/a.out -static
   check $? "gnu \`as\`"
-  qemu-aarch64-static temp/a.out
+  if [[ -n $gdb ]]; then
+    echo "qemu opened for gdb."
+    qemu-aarch64-static -g 1234 temp/a.out
+  else
+    qemu-aarch64-static temp/a.out
+  fi
   echo; echo done.
   exit 0
 fi
 
 if [[ -n $testcase ]]; then
   # Supply the leading zero.
-  if [[ $testcase -ge 0 && $testcase -le 9 && $(echo $testcase | wc -c) -eq 2 ]]; then
+  if [[ $testcase == <-> && $testcase -ge 0 && $testcase -le 9 ]]; then
     testcase=0$testcase
   fi
   # Find the test case.

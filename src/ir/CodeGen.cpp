@@ -292,6 +292,16 @@ void CodeGen::emitStmt(ASTNode *node) {
     return;
   }
 
+  if (isa<ContinueNode>(node)) {
+    builder.create<ContinueOp>();
+    return;
+  }
+
+  if (isa<BreakNode>(node)) {
+    builder.create<BreakOp>();
+    return;
+  }
+
   if (auto decl = dyn_cast<VarDeclNode>(node); decl && !decl->global) {
     auto arrTy = dyn_cast<ArrayType>(decl->type);
     auto allocaTy = Type::pointer(convert(arrTy ? arrTy->base : decl->type));
@@ -435,13 +445,15 @@ void CodeGen::emitStmt(ASTNode *node) {
     Builder::Guard guard(builder);
     builder.setToStart(ifso);
     emitStmt(br->ifso);
-    builder.create<YieldOp>();
+    if (ifso->getNumOps() == 0 || !isTerminator(ifso->getLastOp()))
+      builder.create<YieldOp>();
     
     auto ifnot = op->appendRegion();
     builder.setToStart(ifnot);
     if (br->ifnot) 
       emitStmt(br->ifnot);
-    builder.create<YieldOp>();
+    if (ifnot->getNumOps() == 0 || !isTerminator(ifnot->getLastOp()))
+      builder.create<YieldOp>();
     return;
   }
 
@@ -467,6 +479,7 @@ void CodeGen::emitStmt(ASTNode *node) {
     auto region = op->appendRegion();
     builder.setToStart(region);
     emitStmt(loop->body);
+    builder.create<CondMarkerOp>();
     cond = emitExpr(loop->cond);
     builder.create<ConditionOp>()->with(cond);
     return;

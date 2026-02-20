@@ -13,8 +13,10 @@ Pass *makeHighDCE(ir::ModuleOp *module);
 static Rule rules[] = {
   Rule("(addw (movi 'a) (movi 'b))") >> "(movi:i32 (!add 'a 'b))",
   Rule("(addw x (movi 'a))") >> "(addwi:i32 x 'a)",
-  Rule("(addx x (movi 'a))") >> "(addxi:i32 x 'a)",
+  Rule("(addx x (movi 'a))") >> "(addxi:i64 x 'a)",
   Rule("(subw (movi 'a) (movi 'b))") >> "(movi:i32 (!sub 'a 'b))",
+  Rule("(subw x (movi 'a))") >> "(subwi:i32 x 'a)",
+  Rule("(subx x (movi 'a))") >> "(subxi:i64 x 'a)",
   Rule("(mulw x (movi 'a))") >> "x" when { return imm("'a") == 1; },
   Rule("(mulw (movi 'a) (movi 'b))") >> "(movi:i32 (!mul 'a 'b))",
   Rule("(addwi x 'a)") >> "x" when { return imm("'a") == 0; },
@@ -87,6 +89,48 @@ bool InstCombine::rewrite(Op *op) const {
     else if (auto mov = dyn_cast<MovIOp>(lhs->def))
       return rewriteMul(op, rhs, mov->value);
 
+    return false;
+  }
+
+  if (isa<AddWOp>(op)) {
+    Builder builder;
+    auto lhs = op->val(0), rhs = op->val(1);
+    
+    //   lsl %rhs, %1, #x
+    //   add %out, %lhs, %rhs
+    // =>
+    //   add %out, %lhs, %1, #x
+    if (auto lsl = dyn_cast<LslWIOp>(rhs->def)) {
+      auto addw = builder.replace<AddWLslOp>(op, i32)->with(lhs, lsl->val());
+      addw->value = lsl->value;
+      return true;
+    }
+    if (auto lsl = dyn_cast<LslWIOp>(lhs->def)) {
+      auto addw = builder.replace<AddWLslOp>(op, i32)->with(rhs, lsl->val());
+      addw->value = lsl->value;
+      return true;
+    }
+    return false;
+  }
+
+  if (isa<AddXOp>(op)) {
+    Builder builder;
+    auto lhs = op->val(0), rhs = op->val(1);
+    
+    //   lsl %rhs, %1, #x
+    //   add %out, %lhs, %rhs
+    // =>
+    //   add %out, %lhs, %1, #x
+    if (auto lsl = dyn_cast<LslWIOp>(rhs->def)) {
+      auto addw = builder.replace<AddXLslOp>(op, i64)->with(lhs, lsl->val());
+      addw->value = lsl->value;
+      return true;
+    }
+    if (auto lsl = dyn_cast<LslWIOp>(lhs->def)) {
+      auto addw = builder.replace<AddXLslOp>(op, i64)->with(rhs, lsl->val());
+      addw->value = lsl->value;
+      return true;
+    }
     return false;
   }
 

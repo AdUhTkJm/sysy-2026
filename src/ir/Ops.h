@@ -14,15 +14,18 @@ public: \
   X(ModuleOp) X(AddIOp) X(SubIOp) X(MulIOp) X(DivIOp) X(ModIOp) \
   X(AndIOp) X(OrIOp) X(XorIOp) X(ReturnOp) X(ForOp) \
   X(IfOp) X(AllocaOp) X(LoadOp) X(StoreOp) X(ConditionOp) \
-  X(ArrayStoreOp) X(ArrayLoadOp) X(CallOp) \
+  X(ArrayStoreOp) X(ArrayLoadOp) X(CallOp) X(CondMarkerOp) \
   X(GetGlobalOp) X(EqOp) X(NeOp) X(LtOp) X(LeOp) X(NotOp) \
-  X(YieldOp) X(I2FOp) X(F2IOp) X(UndefOp) \
+  X(YieldOp) X(I2FOp) X(F2IOp) X(UndefOp) X(ContinueOp) X(BreakOp) \
   X(DoWhileOp) X(AddLOp) X(AddFOp) X(SubFOp) X(MulFOp) X(DivFOp) \
   /* ARM operations */ \
   X(AddWOp) X(AddXOp) X(MaddWOp) X(MsubWOp) \
   X(SubWOp) X(SubXOp) X(MulWOp) X(MulXOp) \
   X(DivWOp) X(DivXOp) X(CmpEqOp) X(CmpNeOp) X(CmpLtOp) X(CmpLeOp) \
   X(RetOp) X(EorWOp) X(LslWOp) \
+
+#define terminator_list(X) \
+  X(ReturnOp) X(BreakOp) X(ContinueOp) X(YieldOp)
 
 #define arm_branch_op_list(X) \
   X(BeqOp) X(BneOp) X(BltOp) X(BleOp) X(CbzOp) X(CbnzOp) X(BgeOp) X(BgtOp)
@@ -41,7 +44,8 @@ public: \
 #define arm_imm_op_list(X) \
   X(AddWIOp) X(AddXIOp) X(AddWLslOp) X(AddXLslOp) \
   X(MovIOp) X(LdrOp) X(StrOp) X(LdpOp) X(StpOp) \
-  X(EorWIOp) X(LdrLslOp) X(StrLshOp) X(LslWIOp)
+  X(EorWIOp) X(LdrLslOp) X(StrLslOp) X(LslWIOp) \
+  X(SubWIOp) X(SubXIOp)
 
 #define arm_mem_op_list(X) \
   X(LdrOp) X(StrOp) X(LdpOp) X(StpOp)
@@ -72,30 +76,25 @@ public: \
 #define targetful_op(Ty, ...) \
   op(Ty, \
     Block *target = nullptr; \
-    Block *&getTarget() { return target; } \
-    Block *getTarget() const { return target; } \
     __VA_ARGS__ \
   );
 
 #define branch_op(Ty, ...) \
   targetful_op(Ty, \
     Block *other = nullptr; \
-    Block *&getOther() { return target; } \
-    Block *getOther() const { return target; } \
     __VA_ARGS__ \
   );
 
 #define imm_op(Ty, ...) \
   op(Ty, \
     int value = 0; \
-    int &getValue() { return value; } \
-    int getValue() const { return value; } \
     __VA_ARGS__ \
   );
 
 namespace ir {
 
 bool hasSideEffect(Op *);
+bool isTerminator(Op *);
 
 #define opkind(Ty) Ty,
 enum class OpKind {

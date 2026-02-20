@@ -189,6 +189,9 @@ format(I2FOp, "$r0 = (f32) $x0");
 format(F2IOp, "$r0 = (i32) $x0");
 format(UndefOp, "\\$r0 = undef $tr0");
 format(DoWhileOp, "$r>0 = do-while $x>0");
+format(ContinueOp, "continue");
+format(BreakOp, "break");
+format(CondMarkerOp, "<condition begin>")
 /* ARM operations */
 format(AddWOp, "add $r0, $x0, $x1");
 format(AddXOp, "add $R0, $X0, $X1");
@@ -223,17 +226,19 @@ format(RetOp, "ret");
 
 iprinter(AddWIOp, add)
 iprinter(AddXIOp, add)
+iprinter(SubWIOp, sub)
+iprinter(SubXIOp, sub)
 iprinter(EorWIOp, eor)
 iprinter(LslWIOp, lsl)
 
 printer(AddWLslOp) {
   auto x = cast<AddWLslOp>(op);
-  os << "add" << printer->str(op->ret()) << ", ";
+  os << "add " << printer->str(op->ret()) << ", ";
   os << printer->str(op->val(0)) << ", " << printer->str(op->val(1)) << ", lsl #" << x->value;
 }
 printer(AddXLslOp) {
   auto x = cast<AddXLslOp>(op);
-  os << "add" << printer->str(op->ret()) << ", ";
+  os << "add " << printer->str(op->ret()) << ", ";
   os << widen(printer->str(op->val(0))) << ", " << widen(printer->str(op->val(1))) << ", lsl #" << x->value;
 }
 
@@ -262,12 +267,12 @@ printer(LdrLslOp) {
   os << "]";
 }
 
-printer(StrLshOp) {
-  auto str = cast<StrLshOp>(op);
+printer(StrLslOp) {
+  auto str = cast<StrLslOp>(op);
   os << "str " << printer->str(op->val(2)) << ", ["
      << printer->str(op->val()) << ", " << widen(printer->str(op->val(1)));
   if (str->value)
-    os << ", lsl " << str->value;
+    os << ", lsl #" << str->value;
   os << "]";
 }
 

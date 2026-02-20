@@ -101,6 +101,10 @@ Op *Op::getParentOp() const {
   return region->getParentOp();
 }
 
+Region *Op::getParentRegion() const {
+  return parent->parent;
+}
+
 void Op::moveBefore(Op *op) {
   if (op == this)
     return;
@@ -439,6 +443,13 @@ void Region::prepareErase() {
         region->prepareErase();
     }
   }
+}
+
+size_t Region::getNumOps() const {
+  size_t result = 0;
+  for (auto bb : bbs)
+    result += bb->getNumOps();
+  return result;
 }
 
 void Region::updatePreds() const {

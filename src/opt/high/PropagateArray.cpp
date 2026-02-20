@@ -85,10 +85,12 @@ declare_pass(PropagateArray) {
     }
   })
 
-  for (auto fn : collectFunctions()) {
-    if (!fn->ret()->used() && fn->name != "main")
+  fixed(for (auto fn : collectFunctions()) {
+    if (!fn->ret()->used() && fn->name != "main") {
       fn->erase();
-  }
+      mark_changed;
+    }
+  })
 }
 
 }

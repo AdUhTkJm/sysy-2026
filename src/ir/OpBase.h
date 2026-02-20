@@ -121,6 +121,7 @@ public:
   Op *prevOp() const;
   Op *getParentOp() const;
   Block *getParentBlock() const { return parent; }
+  Region *getParentRegion() const;
 
   Value *getResult(int i = 0) const { return results[i]; }
   const auto &getResults() const { return results; }
@@ -401,6 +402,7 @@ public:
   const auto &getBlocks() const { return bbs; }
   size_t getNumBlocks() const { return bbs.size(); }
   Block *appendBlock();
+  size_t getNumOps() const;
 
   void prepareErase();
   void erase();

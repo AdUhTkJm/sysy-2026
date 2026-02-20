@@ -39,16 +39,48 @@ static Op *flip(Op *op) {
 }
 
 declare_local_pass(LateLegalize,
+  // The `prologue()` function expects a single return instruction at end,
+  // to insert epilogue.
+  void ensureSingleReturn(FuncOp *func);
   void prologue(FuncOp *func);
   void relocateAlloca(FuncOp *func);
   void rewriteJumps(Block *bb);
 ) {
+  ensureSingleReturn(func);
   prologue(func);
   relocateAlloca(func);
 
   auto region = func->getRegion();
   for (auto bb : *region)
     rewriteJumps(bb);
+}
+
+void LateLegalize::ensureSingleReturn(FuncOp *func) {
+  std::vector<Block*> returning;
+  auto region = func->getRegion();
+
+  for (auto bb : *region) {
+    if (isa<RetOp>(bb->getLastOp()))
+      returning.push_back(bb);
+  }
+  assert(!returning.empty());
+
+  if (returning.size() == 1) {
+    auto bb = returning[0];
+    bb->moveToEnd(region);
+    return;
+  }
+
+  Builder builder;
+  auto end = region->appendBlock();
+
+  builder.setToEnd(end);
+  builder.create<RetOp>();
+
+  for (auto bb : returning) {
+    auto b = builder.replace<BOp>(bb->getLastOp());
+    b->target = end;
+  }
 }
 
 void LateLegalize::prologue(FuncOp *func) {
