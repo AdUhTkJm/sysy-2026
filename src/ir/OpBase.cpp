@@ -172,6 +172,11 @@ void Op::setOperand(int i, Value *v) {
   v->uses.insert(this);
 }
 
+void Op::insertOperand(int i, Value *v) {
+  operands.insert(operands.begin() + i, v);
+  v->uses.insert(this);
+}
+
 void Op::removeOperand(int i) {
   auto value = operands[i];
   operands.erase(operands.begin() + i);
@@ -204,6 +209,8 @@ void Op::erase() {
   parent->remove(place);
   clearOperands();
 
+  for (auto region : regions)
+    region->prepareErase();
   for (auto region : regions)
     region->erase();
   delete this;
@@ -412,16 +419,26 @@ Region::MoveResult Region::moveTo(Block *bb) {
 void Region::erase() {
   for (auto bb : bbs) {
     for (auto op : bb->getOps()) {
-      op->clearOperands();
       for (auto region : op->getRegions())
         region->erase();
     }
   }
-  auto copy = bbs;
-  for (auto bb : copy)
-    bb->erase();
+  for (auto it = bbs.begin(); it != bbs.end();)
+    it = bbs.erase(it);
+  
   parent->removeRegion(this);
   delete this;
+}
+
+// Remove all operands of everything to break the use-def chain.
+void Region::prepareErase() {
+  for (auto bb : bbs) {
+    for (auto op : bb->getOps()) {
+      op->clearOperands();
+      for (auto region : op->getRegions())
+        region->prepareErase();
+    }
+  }
 }
 
 void Region::updatePreds() const {

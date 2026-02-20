@@ -14,7 +14,6 @@ concept walk_order = std::same_as<T, Preorder> || std::same_as<T, Postorder>;
 #endif
 
 class Pass {
-protected:
 private:
   template<class F>
   void walkImpl(ir::Op *parent, const F &f, Preorder) const {
@@ -48,9 +47,11 @@ private:
   void walkImpl(ir::Op *parent, const F &f) const {
     walkImpl(parent, f, T{});
   }
+public:
+  using CallGraph = std::map<ir::FuncOp*, std::set<ir::FuncOp*>>;
 protected:
   ir::ModuleOp *const module;
-  std::vector<ir::FuncOp*> collectFunctions();
+  std::vector<ir::FuncOp*> collectFunctions() const;
 
   template<class T>
   std::vector<T*> collectOps(ir::Op *root) const {
@@ -87,6 +88,11 @@ protected:
   // This can be either a function argument, a GlobalOp or an alloca.
   ir::Op *directBaseOf(ir::Op *op) const;
   ir::Op *baseOf(ir::Value *v) const;
+
+  // u -> v means `u` is called by `v`.
+  CallGraph calledGraph() const;
+  // u -> v means `u` calls `v`.
+  CallGraph callGraph() const;
 public:
   virtual void run() = 0;
   virtual const char *name() = 0;

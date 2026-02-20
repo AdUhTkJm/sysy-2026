@@ -26,7 +26,9 @@ while [[ $# -gt 0 ]] do
     case "$2" in
     f) testdir=functional; testcase=$3;;
     h) testdir=h_functional; testcase=$3;;
-    p) testdir=performance; testcase=$3;;
+    p|ap) testdir=performance; testcase=$3;;
+    rp) testdir=rv-performance; testcase=$3;;
+    rfp) testdir=rv-final-performance; testcase=$3;;
     *) testcase=$2; v=2;;
     esac
     shift $v;;

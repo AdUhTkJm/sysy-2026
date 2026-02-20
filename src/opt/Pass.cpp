@@ -7,7 +7,7 @@ using namespace ir;
 
 namespace opt {
 
-std::vector<FuncOp*> Pass::collectFunctions() {
+std::vector<FuncOp*> Pass::collectFunctions() const {
   std::vector<FuncOp*> result;
   auto region = module->getRegion();
   assert(region->getNumBlocks() == 1);
@@ -98,6 +98,26 @@ Op *Pass::baseOf(Value *v) const {
     return op;
   
   return nullptr;
+}
+
+Pass::CallGraph Pass::calledGraph() const {
+  CallGraph cg;
+  for (auto fn : collectFunctions()) {
+    cg[fn]; // Default-construct.
+    for_all(CallOp, fn)
+      cg[cast<FuncOp>(op->val()->def)].insert(fn);
+  }
+  return cg;
+}
+
+Pass::CallGraph Pass::callGraph() const {
+  CallGraph cg;
+  for (auto fn : collectFunctions()) {
+    cg[fn]; // Default-construct.
+    for_all(CallOp, fn)
+      cg[fn].insert(cast<FuncOp>(op->val()->def));
+  }
+  return cg;
 }
 
 }

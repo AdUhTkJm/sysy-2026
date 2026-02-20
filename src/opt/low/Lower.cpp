@@ -8,7 +8,7 @@ namespace opt {
 
 declare_pass(Lower,
   void runImpl(FuncOp *func);
-  const DimAttr *getDim(Value *addr) const;
+  std::vector<int> getDim(Value *addr) const;
 
   bool hasInit = false;
   FuncOp *main = nullptr;
@@ -26,18 +26,14 @@ declare_pass(Lower,
   }
 }
 
-const DimAttr *Lower::getDim(Value *addr) const {
+std::vector<int> Lower::getDim(Value *addr) const {
   auto base = baseOf(addr);
   if (auto dim = base->get<DimAttr>())
-    return dim;
+    return dim->dims;
 
   // This has to be a function argument.
   assert(isa<FuncOp>(base));
-  auto index = base->getOperandIndex(addr);
-  for (auto call : base->ret()->getUses())
-    return getDim(call->val(index + 1));
-
-  assert(false && "the function has to be used!");
+  return base->get<ArgDimAttr>()->dims.at(addr);
 }
 
 void Lower::runImpl(FuncOp *func) {
@@ -112,9 +108,7 @@ void Lower::runImpl(FuncOp *func) {
     builder.setBefore(op);
 
     Value *dest = op->val(0), *val = op->val(op->getNumOperands() - 1);
-    auto dim = getDim(dest);
-    assert(dim);
-    const auto &dims = dim->dims;
+    auto dims = getDim(dest);
     
     int stride = asmSize(val->type);
     for (int i = (int) dims.size() - 1; i >= 0; i--) {
@@ -133,13 +127,17 @@ void Lower::runImpl(FuncOp *func) {
     builder.setBefore(op);
 
     Value *dest = op->val(0);
-    auto dim = getDim(dest);
-    assert(dim);
-    const auto &dims = dim->dims;
+    auto dims = getDim(dest);
     
     int stride = asmSize(op->ret()->type);
-    // Same as the one before.
-    for (int i = (int) dims.size() - 1; i >= 0; i--) {
+    // It is possible that ArrayLoadOp only dereferences a certain amount of dimensions,
+    // but not all.
+    int i = dims.size() - 1;
+    while (i + 1 >= (int) op->getNumOperands())
+      stride *= dims[i--];
+
+    bool fulldim = i + 1 == (int) dims.size();
+    for (; i >= 0; i--) {
       auto movi = builder.create<MovIOp>(i32);
       movi->value = stride;
 
@@ -148,8 +146,13 @@ void Lower::runImpl(FuncOp *func) {
       stride *= dims[i];
     }
 
-    auto ty = op->ret()->type;
-    builder.replace<LdrOp>(op, ty)->with(dest);
+    if (fulldim) {
+      auto ty = op->ret()->type;
+      builder.replace<LdrOp>(op, ty)->with(dest);
+    } else {
+      op->ret()->replaceAllUsesWith(dest);
+      op->erase();
+    }
   }
 
   // Lower GetGlobals after we finished accessing arrays.

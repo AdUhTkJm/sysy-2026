@@ -5,13 +5,16 @@
 #include "../utils/DataStructure.h"
 #include "../utils/Alloc.h"
 #include <numeric>
+#include <map>
 
 namespace ir {
 
 #define attr_list(X) \
-  X(IntAttr) X(SizeAttr) X(DimAttr) X(ConstIArrAttr) X(ConstFArrAttr) X(ImpureAttr)
+  X(IntAttr) X(SizeAttr) X(DimAttr) X(ArgDimAttr) \
+  X(ConstIArrAttr) X(ConstFArrAttr) X(ImpureAttr) X(RecursiveAttr)
 
 class Block;
+class Value;
   
 class Attr {
 public:
@@ -54,6 +57,7 @@ public:
   SizeAttr(size_t size): size(size) {}
 };
 
+// This is for a particular alloca.
 class DimAttr : public AttrImpl<DimAttr> {
 public:
   std::vector<int> dims;
@@ -62,6 +66,13 @@ public:
   int size() const {
     return std::accumulate(dims.begin(), dims.end(), 1, [](int v, int x) { return v * x; });
   }
+};
+
+// This is for functions, and annotates its arguments.
+class ArgDimAttr : public AttrImpl<ArgDimAttr> {
+public:
+  std::map<Value*, std::vector<int>> dims;
+  ArgDimAttr(const std::map<Value*, std::vector<int>> &dims): dims(dims) {}
 };
 
 class ConstIArrAttr : public AttrImpl<ConstIArrAttr> {
@@ -98,6 +109,7 @@ public:
 
 // Empty.
 class ImpureAttr : public AttrImpl<ImpureAttr> {};
+class RecursiveAttr : public AttrImpl<RecursiveAttr> {};
 
 using Attributes = std::vector<const Attr*>;
 

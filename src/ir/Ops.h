@@ -21,8 +21,8 @@ public: \
   /* ARM operations */ \
   X(AddWOp) X(AddXOp) X(MaddWOp) X(MsubWOp) \
   X(SubWOp) X(SubXOp) X(MulWOp) X(MulXOp) \
-  X(DivWOp) X(DivXOp) X(CmpEqOp) X(CmpNeOp) X(CmpLtOp) X(CmpLeOp)  \
-  X(RetOp) X(EorWOp) \
+  X(DivWOp) X(DivXOp) X(CmpEqOp) X(CmpNeOp) X(CmpLtOp) X(CmpLeOp) \
+  X(RetOp) X(EorWOp) X(LslWOp) \
 
 #define arm_branch_op_list(X) \
   X(BeqOp) X(BneOp) X(BltOp) X(BleOp) X(CbzOp) X(CbnzOp) X(BgeOp) X(BgtOp)
@@ -39,8 +39,9 @@ public: \
   X(JumpOp)
 
 #define arm_imm_op_list(X) \
-  X(AddWIOp) X(AddXIOp) X(MovIOp) X(LdrOp) X(StrOp) X(LdpOp) X(StpOp) \
-  X(EorWIOp)
+  X(AddWIOp) X(AddXIOp) X(AddWLslOp) X(AddXLslOp) \
+  X(MovIOp) X(LdrOp) X(StrOp) X(LdpOp) X(StpOp) \
+  X(EorWIOp) X(LdrLslOp) X(StrLshOp) X(LslWIOp)
 
 #define arm_mem_op_list(X) \
   X(LdrOp) X(StrOp) X(LdpOp) X(StpOp)

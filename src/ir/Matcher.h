@@ -24,6 +24,7 @@ struct Env {
 #define action_decl(Ty, ...) Ty, 
 enum class ActionKind {
   action_list(action_decl)
+  literal
 };
 
 #undef action_decl

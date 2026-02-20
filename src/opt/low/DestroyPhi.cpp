@@ -1,4 +1,5 @@
 #include "Common.h"
+#include <queue>
 
 namespace opt {
 
@@ -79,17 +80,40 @@ void DestroyPhi::lowerPhi(Block *bb) {
     }
 
     // First deal with acyclic parts, and remove them from `copy`.
-    fixed(for (auto it = copy.begin(); it != copy.end(); ) {
-      auto [dst, res] = *it;
-      auto [src, ty] = res;
+    std::unordered_map<Reg, int> indegree;
+    for (auto &[dst, pair] : copy)
+      indegree[dst] = 0;
 
-      if (!copy.count(src)) {
-        emitCopy(src, dst, ty);
-        it = copy.erase(it);
-        mark_changed;
-      } else
-        ++it;
-    });
+    for (auto &[dst, pair] : copy) {
+      auto src = pair.first;
+      if (copy.count(src))
+        indegree[src]++;
+    }
+
+    // Toposort.
+    std::queue<Reg> q;
+    for (auto &[r, deg] : indegree) {
+      if (deg == 0)
+        q.push(r);
+    }
+
+    while (!q.empty()) {
+      Reg dst = q.front();
+      q.pop();
+
+      if (!copy.count(dst))
+        continue;
+
+      auto [src, ty] = copy[dst];
+      emitCopy(src, dst, ty);
+
+      copy.erase(dst);
+
+      if (copy.count(src)) {
+        if (--indegree[src] == 0)
+          q.push(src);
+      }
+    }
 
     // Now the ones in `copy` form cycles.
     while (!copy.empty()) {

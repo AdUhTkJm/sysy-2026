@@ -20,6 +20,8 @@ void populate(opt::PassManager &pm) {
   add_pass(EnsureTerminator);
   add_pass(Mem2Reg);
   add_pass(HighDCE);
+  add_pass(Recursive);
+  add_pass(RaiseArray);
   add_pass(PropagateArray);
 
   // Mid-IR passes.
@@ -35,6 +37,7 @@ void populate(opt::PassManager &pm) {
   add_pass(DestroyPhi);
   add_pass(SimplifyCFG);
   add_pass(LateLegalize);
+  add_pass(AddressMode);
   add_pass(Print);
 }
 

@@ -78,15 +78,26 @@ const Pattern *Parser::parse() {
     std::string_view name = cur.text;
     advance();
 
-    Pattern *p = new Pattern(name[0] == '\'' ? Pattern::Imm : Pattern::Var, name);
+    // A number literal.
+    if (name[0] <= '9' && name[0] >= '0') {
+      auto pat = new Pattern(ActionKind::literal);
+      int value = 0;
+      for (int i = name.size() - 1; i >= 0; i--)
+        value = value * 10 + name[i] - '0';
+      pat->children[0] = (Pattern*) (unsigned long) value;
+      std::cout << "found literal";
+      return pat;
+    } 
+
+    auto pat = new Pattern(name[0] == '\'' ? Pattern::Imm : Pattern::Var, name);
 
     if (cur.kind == Colon) {
       advance();
       auto tyname = expectIdent();
       assert(tyname.size() < 4);
-      strncpy(p->tyname, tyname.begin(), tyname.size());
+      strncpy(pat->tyname, tyname.begin(), tyname.size());
     }
-    return p;
+    return pat;
   }
 
   expect(LPar);
@@ -283,6 +294,9 @@ int evaluate(const Pattern *pattern, const Env &env) {
     return env.imms.at(pattern->name);
 
   assert(pattern->kind == Pattern::Action);
+  if (pattern->act == ActionKind::literal)
+    return (unsigned long) pattern->children[0];
+
   const static std::map<ActionKind, std::function<int(int, int)>> binmap {
     action_list(binact)
   };

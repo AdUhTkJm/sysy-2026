@@ -9,6 +9,7 @@ TEMP_DIR = Path("temp")
 COMPILER = "build/hcc"   # your compiler
 QEMU = "qemu-aarch64-static"
 RESULT_FILE = Path("results.json")
+GCC = "aarch64-linux-gnu-gcc"
 
 # Remove trailing spaces on each line.
 def normalize(text: str):
@@ -16,10 +17,11 @@ def normalize(text: str):
 
 def run_test(test_path: Path) -> tuple[bool, None | float]:
   name = test_path.stem
-  exe_path = TEMP_DIR / name
+  asm_path = TEMP_DIR / (name + ".s")
+  exe_path = TEMP_DIR / (name + ".exe")
 
   hcc = subprocess.run(
-    [COMPILER, str(test_path), "-o", str(exe_path)],
+    [COMPILER, str(test_path), "-o", str(asm_path)],
     stdout=subprocess.PIPE,
     stderr=subprocess.PIPE,
     text=True,
@@ -28,8 +30,24 @@ def run_test(test_path: Path) -> tuple[bool, None | float]:
 
   if hcc.returncode != 0:
     print(f"hcc error: {hcc.returncode}")
-    os.remove(exe_path)
+    try: os.remove(asm_path)
+    except: ...
     return False, None
+  
+  # c test/lib.c -x assembler $output -o temp/a.out -static
+  gcc = subprocess.run(
+    [GCC, "-x", "c", "test/lib.c", "-x", "assembler", asm_path, "-o", exe_path, "-static"],
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    text=True,
+  )
+  if gcc.returncode != 0:
+    print(f"gcc error: {gcc.returncode}")
+    try: os.remove(exe_path)
+    except: ...
+    return False, None
+
+  os.remove(asm_path)
 
   input_file = test_path.with_suffix(".in")
   input = None
@@ -63,17 +81,17 @@ def run_test(test_path: Path) -> tuple[bool, None | float]:
   expected_stdout = normalize(expected_stdout)
   actual_stdout = normalize(actual_stdout)
 
-  passed = (
-    expected_stdout == actual_stdout and
-    expected_return == actual_return
-  )
-  if not passed:
-    print(expected_stdout)
-    print(actual_stdout)
-    print(expected_return)
-    print(actual_return)
+  if expected_stdout != actual_stdout:
+    print(f"expected: {expected_stdout}")
+    print(f"got: {actual_stdout}")
+    return False, None
+  
+  if expected_return != actual_return:
+    print(f"expected return: {expected_return}")
+    print(f"got: {actual_return}")
+    return False, None
 
-  return passed, elapsed
+  return True, elapsed
 
 timemap = {}
 for file in TEST_ROOT.rglob("*.sy"):
@@ -90,3 +108,5 @@ for file in TEST_ROOT.rglob("*.sy"):
 
 if len(timemap):
   print(timemap)
+
+run_test(Path("test/functional/16_mulc.sy"))

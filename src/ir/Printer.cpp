@@ -10,6 +10,15 @@ namespace ir {
 
 Printer printer;
 
+static std::string widen(const std::string &str) {
+  if (str[0] != 'w')
+    return str;
+
+  std::string result = str;
+  result[0] = 'x';
+  return result;
+}
+
 void printWithFormat(std::ostream &os, const Op *op, Printer *printer, const char *fmt) {
   // The '\\' at front means this is a hidden operation.
   if (*fmt == '\\') {
@@ -192,25 +201,40 @@ format(MulXOp, "mul $R0, $X0, $X1");
 format(DivWOp, "sdiv $r0, $x0, $x1");
 format(DivXOp, "sdiv $R0, $X0, $X1");
 format(EorWOp, "eor $r0, $x0, $x1");
+format(LslWOp, "lsl $r0, $x0, $x1");
 format(CmpEqOp, "cmp $x0, $x1\ncset $r0, eq");
 format(CmpNeOp, "cmp $x0, $x1\ncset $r0, ne");
 format(CmpLtOp, "cmp $x0, $x1\ncset $r0, lt");
 format(CmpLeOp, "cmp $x0, $x1\ncset $r0, le");
 format(RetOp, "ret");
 
-printer(AddWIOp) {
-  auto addwi = cast<AddWIOp>(op);
-  os << "add " << printer->str(op->ret()) << ", " << printer->str(op->val()) << ", #" << addwi->value;
-}
+#define iprinter(Ty, name) \
+  printer(Ty) { \
+    auto x = cast<Ty>(op); \
+    os << #name " "; \
+    printer->printResults(os, x); \
+    if (x->getNumResults() > 0) \
+      os << ", "; \
+    printer->printOperands(os, x); \
+    if (x->getNumOperands() > 0) \
+      os << ", "; \
+    os << "#" << x->value; \
+  }
 
-printer(AddXIOp) {
-  auto addwi = cast<AddXIOp>(op);
-  os << "add " << printer->str(op->ret()) << ", " << printer->str(op->val()) << ", #" << addwi->value;
-}
+iprinter(AddWIOp, add)
+iprinter(AddXIOp, add)
+iprinter(EorWIOp, eor)
+iprinter(LslWIOp, lsl)
 
-printer(EorWIOp) {
-  auto eor = cast<EorWIOp>(op);
-  os << "eor " << printer->str(op->ret()) << ", " << printer->str(op->val()) << ", #" << eor->value;
+printer(AddWLslOp) {
+  auto x = cast<AddWLslOp>(op);
+  os << "add" << printer->str(op->ret()) << ", ";
+  os << printer->str(op->val(0)) << ", " << printer->str(op->val(1)) << ", lsl #" << x->value;
+}
+printer(AddXLslOp) {
+  auto x = cast<AddXLslOp>(op);
+  os << "add" << printer->str(op->ret()) << ", ";
+  os << widen(printer->str(op->val(0))) << ", " << widen(printer->str(op->val(1))) << ", lsl #" << x->value;
 }
 
 printer(MovIOp) {
@@ -226,6 +250,25 @@ printer(LdrOp) {
 printer(StrOp) {
   auto str = cast<StrOp>(op);
   os << "str " << printer->str(op->val(1)) << ", [" << printer->str(op->val(0)) << ", #" << str->value << "]";
+}
+
+printer(LdrLslOp) {
+  auto ldr = cast<LdrLslOp>(op);
+  os << "ldr " << printer->str(op->ret()) << ", ["
+     << printer->str(op->val()) << ", " << widen(printer->str(op->val(1)));
+  
+  if (ldr->value)
+    os << ", lsl #" << ldr->value;
+  os << "]";
+}
+
+printer(StrLshOp) {
+  auto str = cast<StrLshOp>(op);
+  os << "str " << printer->str(op->val(2)) << ", ["
+     << printer->str(op->val()) << ", " << widen(printer->str(op->val(1)));
+  if (str->value)
+    os << ", lsl " << str->value;
+  os << "]";
 }
 
 printer(LdpOp) {
@@ -411,22 +454,31 @@ attr_printer(DimAttr) {
   os << "<dims = " << cast<DimAttr>(attr)->dims << ">";
 }
 
+attr_printer(ArgDimAttr) {
+  auto arg = cast<ArgDimAttr>(attr);
+  os << "<dims: ";
+  for (auto [k, v] : arg->dims)
+    os << printer->str(k) << ": [" << v << "], ";
+  os << "end>";
+}
+
 attr_printer(ConstIArrAttr) {
   auto iarr = cast<ConstIArrAttr>(attr);
   os << "<arr = ";
-  if (iarr->value.size() > 0)
+  if (iarr->value.size() > iarr->zeroSuffix)
     os << iarr->value[0];
-  for (unsigned i = 1; i < iarr->value.size() - iarr->zeroSuffix; i++)
+  for (unsigned i = 1; i + iarr->zeroSuffix < iarr->value.size(); i++)
     os << ", " << iarr->value[i];
-  if (iarr->zeroSuffix > 0)
-    os << ", " << iarr->zeroSuffix << " x 0";
+  if (iarr->value.size() > iarr->zeroSuffix)
+    os << ", ";
+  os << iarr->zeroSuffix << " x 0";
   os << ">"; 
 }
 
 attr_printer(ConstFArrAttr) {
   auto farr = cast<ConstFArrAttr>(attr);
   os << "<arr = ";
-  if (farr->value.size() > 0)
+  if (farr->value.size() > farr->zeroSuffix)
     os << farr->value[0];
   for (unsigned i = 1; i < farr->value.size() - farr->zeroSuffix; i++)
     os << ", " << farr->value[i];
@@ -438,6 +490,11 @@ attr_printer(ConstFArrAttr) {
 attr_printer(ImpureAttr) {
   (void) attr;
   os << "<impure>";
+}
+
+attr_printer(RecursiveAttr) {
+  (void) attr;
+  os << "<rec>";
 }
 
 #define op_map_entry(Ty) { Ty::id, print##Ty },

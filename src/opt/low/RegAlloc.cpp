@@ -42,7 +42,7 @@ declare_pass(RegAlloc,
   std::unordered_map<Value*, Reg> tmpReg;
   // Interference map.
   std::unordered_map<Value*, std::set<Value*>> interf;
-  // Values of readreg, or operands of writereg, or phis (mvs), are prioritzed.
+  // Values of readreg, or operands of writereg, or phis (mvs), are prioritized.
   std::unordered_map<Value*, int> priority;
   // The `key` is preferred to have the same value as `value`.
   std::unordered_map<Value*, Value*> prefer;

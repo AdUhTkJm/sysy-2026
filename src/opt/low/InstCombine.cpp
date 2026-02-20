@@ -7,29 +7,39 @@ namespace opt {
 
 Pass *makeHighDCE(ir::ModuleOp *module);
 
-#define pred [](const Env &env) -> bool
+#define when & [](const Env &env) -> bool
 #define imm(x) env.imms.at(x)
 
 static Rule rules[] = {
+  Rule("(addw (movi 'a) (movi 'b))") >> "(movi:i32 (!add 'a 'b))",
   Rule("(addw x (movi 'a))") >> "(addwi:i32 x 'a)",
   Rule("(addx x (movi 'a))") >> "(addxi:i32 x 'a)",
-  Rule("(mulw x (movi 'a))") >> "x" & pred { return imm("'a") == 1; },
+  Rule("(subw (movi 'a) (movi 'b))") >> "(movi:i32 (!sub 'a 'b))",
+  Rule("(mulw x (movi 'a))") >> "x" when { return imm("'a") == 1; },
   Rule("(mulw (movi 'a) (movi 'b))") >> "(movi:i32 (!mul 'a 'b))",
-  Rule("(addwi x 'a)") >> "x" & pred { return imm("'a") == 0; },
-  Rule("(addxi x 'a)") >> "x" & pred { return imm("'a") == 0; },
+  Rule("(addwi x 'a)") >> "x" when { return imm("'a") == 0; },
+  Rule("(addxi x 'a)") >> "x" when { return imm("'a") == 0; },
   Rule("(str (addxi base 'a) val 'b)") >> "(str base val (!add 'a 'b))",
   Rule("(ldr:T (addxi base 'a) 'b)") >> "(ldr:T base (!add 'a 'b))",
 };
 
 declare_local_pass(InstCombine,
-  void combineBranch(Op *op);
+  void combineBranch(Op *op) const;
+  bool rewrite(Op *op) const;
+
+  bool rewriteMul(Op *op, Value *v, int mul) const;
 ) {
   fixed(walk<Postorder>(func, [&](Op *op) {
     for (auto &rule : rules) {
       if (rule.rewrite(op)) {
         mark_changed;
-        break;
+        return;
       }
+    }
+
+    if (rewrite(op)) {
+      mark_changed;
+      return;
     }
   });)
 
@@ -49,7 +59,7 @@ declare_local_pass(InstCombine,
     return; \
   }
 
-void InstCombine::combineBranch(Op *op) {
+void InstCombine::combineBranch(Op *op) const {
   Builder builder;
   if (auto br = dyn_cast<CbnzOp>(op)) {
     replace(CmpEqOp, BeqOp);
@@ -66,6 +76,60 @@ void InstCombine::combineBranch(Op *op) {
     replace(CmpLeOp, BltOp);
     return;
   }
+}
+
+// Here we rewrite operations that can hardly be matched by any rule.
+bool InstCombine::rewrite(Op *op) const {
+  if (isa<MulWOp>(op)) {
+    auto lhs = op->val(0), rhs = op->val(1);
+    if (auto mov = dyn_cast<MovIOp>(rhs->def))
+      return rewriteMul(op, lhs, mov->value);
+    else if (auto mov = dyn_cast<MovIOp>(lhs->def))
+      return rewriteMul(op, rhs, mov->value);
+
+    return false;
+  }
+
+  return false;
+}
+
+bool InstCombine::rewriteMul(Op *op, Value *v, int mul) const {
+  Builder builder;
+  auto ty = op->ret()->type;
+
+  if (mul == 0) {
+    auto movi = builder.replace<MovIOp>(op, ty);
+    movi->value = 0;
+    return true;
+  }
+
+  int popcount = __builtin_popcount(mul);
+
+  // This can be expressed with a single left shift.
+  if (popcount == 1) {
+    int ctz = __builtin_ctz(mul);
+    auto lsl = builder.replace<LslWIOp>(op, ty)->with(v);
+    lsl->value = ctz;
+    return true;
+  }
+
+  if (popcount == 2) {
+    // This is:
+    //   add %0, v, v, lsl #(ctz1 - ctz0);
+    //   lsl %1, %0, #ctz0
+    int ctz0 = __builtin_ctz(mul);
+    int ctz1 = __builtin_ctz(mul);
+
+    builder.setBefore(op);
+    auto add = builder.create<AddWLslOp>()->with(v, v);
+    add->value = ctz1 - ctz0;
+
+    auto lsl = builder.replace<LslWIOp>(op, ty)->with(add->ret());
+    lsl->value = ctz0;
+    return true;
+  }
+
+  return false;
 }
 
 }

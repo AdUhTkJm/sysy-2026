@@ -3,6 +3,16 @@
 
 == Pass 列表
 
+=== CodeGen
+
+#postcond[
+  函数会有 `ArgDimAttr` 记录数组参数的维度。
+  
+  数组的 alloca 会有 `DimAttr` 记录维度。
+
+  全局数组会有 `ConstIArrAttr` 记录维度和初始值。
+]
+
 === EnsureTerminator
 
 #postcond[
@@ -19,21 +29,9 @@
 
 === RaiseAlloca
 
-#postcond[
-  不再存在局部的 alloca。
-]
-
 === PropagateArray
 
-#postcond[
-  不再存在是数组的函数参数。
-]
-
 === Lower
-
-#precond[
-  所有的数组操作要么针对 alloca，要么针对全局数组。
-]
 
 === LowerPostSchedule
 

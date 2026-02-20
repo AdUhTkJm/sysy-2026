@@ -215,12 +215,27 @@ Value *CodeGen::emitExpr(ASTNode *node) {
 
 void CodeGen::emitStmt(ASTNode *node) {
   if (auto fn = dyn_cast<FnDeclNode>(node)) {
-    auto fnType = convert(fn->type);
+    auto fnTy = cast<FunctionType>(fn->type);
+    auto fnType = convert(fnTy);
     Types types { fnType };
     concat(types, fnType->argTypes());
     auto func = builder.create<FuncOp>(types);
     func->name = std::move(fn->name);
     globals[func->name] = func->getHandle();
+
+    std::map<Value*, std::vector<int>> dimmap;
+    for (auto [i, ty] : data::enumerate(fnTy->params)) {
+      if (isa<PointerType>(ty)) {
+        dimmap[func->ret(i + 1)] = { 1 };
+        continue;
+      }
+
+      auto arrTy = dyn_cast<ArrayType>(ty);
+      if (!arrTy)
+        continue;
+      dimmap[func->ret(i + 1)] = arrTy->dims;
+    }
+    func->set<ArgDimAttr>(dimmap);
   
     // Now dive into the function body.
     Guard guard(this);
@@ -269,8 +284,11 @@ void CodeGen::emitStmt(ASTNode *node) {
   }
 
   if (auto ret = dyn_cast<ReturnNode>(node)) {
-    auto val = emitExpr(ret->node);
-    builder.create<ReturnOp>()->with(val);
+    if (ret->node) {
+      auto val = emitExpr(ret->node);
+      builder.create<ReturnOp>()->with(val);
+    } else
+      builder.create<ReturnOp>();
     return;
   }
 

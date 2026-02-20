@@ -140,6 +140,7 @@ public:
   void setOperand(int i, Value *v);
   void removeOperand(int i);
   void removeOperand(Value *v);
+  void insertOperand(int i, Value *v);
   int  replaceOperand(Value *before, Value *after);
   void clearOperands();
 
@@ -400,6 +401,8 @@ public:
   const auto &getBlocks() const { return bbs; }
   size_t getNumBlocks() const { return bbs.size(); }
   Block *appendBlock();
+
+  void prepareErase();
   void erase();
 
   void updatePreds() const;
