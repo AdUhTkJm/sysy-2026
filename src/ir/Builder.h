@@ -14,9 +14,9 @@ class Builder {
 
   void insert(Op *op);
 
-  template <class T, class... Types, std::size_t... Is>
-  void emplaceResultsImpl([[gnu::unused]] T* t, std::index_sequence<Is...>, Types&&... types) {
-    (t->results.push_back(new Value(std::forward<Types>(types), t, Is)), ...);
+  template <class T, class... Types>
+  void emplaceResultsImpl([[gnu::unused]] T* t, Types&&... types) {
+    (t->results.push_back(new Value(std::forward<Types>(types), t)), ...);
   }
 
   void replaceImpl(Op *t, Op *other) {
@@ -56,7 +56,7 @@ public:
   )
   T *create(Types ...types) {
     T *t = new T(bb, at);
-    emplaceResultsImpl(t, std::index_sequence_for<Types...>{}, std::forward<Types>(types)...);
+    emplaceResultsImpl(t, std::forward<Types>(types)...);
     insert(t);
     return t;
   }
@@ -64,7 +64,7 @@ public:
   T *create(const std::vector<const Type*> &types) {
     T *t = new T(bb, at);
     for (auto [i, ty] : data::enumerate(types))
-      t->results.push_back(new Value(ty, t, i));
+      t->results.push_back(new Value(ty, t));
     insert(t);
     return t;
   }

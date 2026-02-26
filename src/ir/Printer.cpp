@@ -140,10 +140,10 @@ void Printer::printType(std::ostream &os, const Type *type) {
     const auto &args = type->argTypes();
     for (auto [i, x] : data::enumerate(args)) {
       printType(os, x);
-      if (i != args.size())
+      if (i + 1 != args.size())
         os << ", ";
     }
-    os << ")";
+    os << ") -> ";
     printType(os, type->retType());
   }
   }
@@ -195,6 +195,8 @@ format(CondMarkerOp, "<condition begin>")
 /* ARM operations */
 format(AddWOp, "add $r0, $x0, $x1");
 format(AddXOp, "add $R0, $X0, $X1");
+format(AndWOp, "and $r0, $x0, $x1");
+format(AndXOp, "and $R0, $X0, $X1");
 format(MaddWOp, "madd $r0, $x0, $x1, $x2");
 format(MsubWOp, "msub $r0, $x0, $x1, $x2");
 format(SubWOp, "sub $r0, $x0, $x1");
@@ -226,6 +228,8 @@ format(RetOp, "ret");
 
 iprinter(AddWIOp, add)
 iprinter(AddXIOp, add)
+iprinter(AndWIOp, and)
+iprinter(AndXIOp, and)
 iprinter(SubWIOp, sub)
 iprinter(SubXIOp, sub)
 iprinter(EorWIOp, eor)
@@ -312,6 +316,9 @@ printer(BlOp) {
     os << "(";
     printer->printOperands(os, op);
     os << ")";
+  }
+  if (auto r = op->getNumResults(); r > 0) {
+    os << " [" << r << " results]";
   }
 }
 
@@ -633,6 +640,17 @@ void Printer::dump(std::ostream &out) {
 std::ostream &operator<<(std::ostream &os, const Op *op) {
   printer.print(op);
   printer.dump(os);
+  return os;
+}
+
+std::ostream &operator<<(std::ostream &os, const Value *v) {
+  if (v->def) {
+    os << "result #" << v->def->getResultIndex(v) << " of ";
+    printer.print(v->def);
+    printer.dump(os);
+  } else {
+    os << "block operand #" << v->bb->getArgIndex(v) << " of " << v->bb;
+  }
   return os;
 }
 

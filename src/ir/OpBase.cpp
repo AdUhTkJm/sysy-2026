@@ -69,12 +69,14 @@ Op *Op::nextOp() const {
 }
 
 Value *Op::pushResult(const Type *t) {
-  auto value = new Value(t, this, results.size());
+  auto value = new Value(t, this);
   results.push_back(value);
   return value;
 }
 
 void Op::removeResult(int i) {
+  assert(!results[i]->used());
+  delete results[i];
   results.erase(results.begin() + i);
 }
 
@@ -146,6 +148,7 @@ void Op::clearResults() {
     assert(x->uses.empty());
     delete x;
   }
+  results.clear();
 }
 
 void Op::clearAttributes() {
@@ -226,13 +229,25 @@ Block *Op::createFirstBlock() {
 }
 
 unsigned Op::getOperandIndex(const Value *v) const {
-  return std::find(operands.begin(),operands.end(), v) - operands.begin();
+  return std::find(operands.begin(), operands.end(), v) - operands.begin();
+}
+
+unsigned Op::getResultIndex(const Value *v) const {
+  return std::find(results.begin(), results.end(), v) - results.begin();
 }
 
 std::vector<const Type*> Op::getResultTypes() const {
   std::vector<const Type*> types;
   types.reserve(results.size());
   for (auto x : results)
+    types.push_back(x->type);
+  return types;
+}
+
+std::vector<const Type*> Op::getOperandTypes() const {
+  std::vector<const Type*> types;
+  types.reserve(operands.size());
+  for (auto x : operands)
     types.push_back(x->type);
   return types;
 }
@@ -348,9 +363,13 @@ Block::~Block() {
 }
 
 Value *Block::pushArgument(const Type *type) {
-  auto value = new Value(type, this, args.size());
+  auto value = new Value(type, this);
   args.push_back(value);
   return value;
+}
+
+unsigned Block::getArgIndex(const Value *v) const {
+  return std::find(args.begin(), args.end(), v) - args.begin();
 }
 
 Block *Region::insert(Block *at) {

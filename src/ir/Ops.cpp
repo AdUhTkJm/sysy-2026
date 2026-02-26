@@ -1,4 +1,5 @@
 #include "Ops.h"
+#include "Printer.h"
 #include "../utils/DataStructure.h"
 #include <algorithm>
 
@@ -26,6 +27,9 @@ Value *PhiOp::incomingFrom(const Block *bb) const {
     if (t == bb)
       return val(i);
   }
+
+  std::cerr << "self (in " << printer.str(parent) << "): " << this;
+  std::cerr << "request incoming from: " << bb;
   assert(false && "no incoming from `bb`!");
   return nullptr;
 }

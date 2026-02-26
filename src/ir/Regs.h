@@ -88,7 +88,7 @@ namespace ir {
 constexpr int FP = 0, INT = 1;
 
 #define reg_decl(reg) reg,
-enum Reg {
+enum Reg : unsigned long {
   unallocated,
   regs_list(reg_decl)
   reg_end
@@ -99,7 +99,7 @@ constexpr const char *regnames[] = {
   "<no alloc>", regs_list(reg_name)
 };
 
-inline constexpr const char *regname(int t) {
+inline constexpr const char *regname(unsigned long t) {
   if (t >= reg_end || t < 0)
     return "<bad>";
   
@@ -126,7 +126,7 @@ const Reg argRegs[] = {
   x4, x5, x6, x7,
 };
 
-const Reg scratch = x17;
+const Reg scratch[] = { x15, x16, x17 };
 
 // Order for leaf functions. Prioritize temporaries.
 const Reg leafOrder[] = {
@@ -134,8 +134,7 @@ const Reg leafOrder[] = {
   x4, x5, x6, x7,
 
   x8, x9, x10, x11,
-  x12, x13, x14, x15,
-  x16,
+  x12, x13, x14,
 
   x19, x20, x21, x22,
   x23, x24, x25, x26,
@@ -147,8 +146,7 @@ const Reg normalOrder[] = {
   x4, x5, x6, x7,
 
   x8, x9, x10, x11,
-  x12, x13, x14, x15,
-  x16,
+  x12, x13, x14,
 
   x19, x20, x21, x22,
   x23, x24, x25, x26,

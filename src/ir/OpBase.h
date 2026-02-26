@@ -128,6 +128,7 @@ public:
   std::vector<const Type*> getResultTypes() const;
   size_t getNumResults() const { return results.size(); }
   size_t getNumOperands() const { return operands.size(); }
+  std::vector<const Type*> getOperandTypes() const;
 
   // Implicitly append a block to the region.
   Region *appendRegion();
@@ -169,9 +170,10 @@ public:
   const auto &getOperands() const { return operands; }
   const auto &getAttrs() const { return attrs; }
   unsigned getOperandIndex(const Value *v) const;
+  unsigned getResultIndex(const Value *v) const;
 
-  Value *val(unsigned i = 0) const { assert(i < operands.size()); return operands[i]; }
-  Value *ret(unsigned i = 0) const { assert(i < results.size()); return results[i]; }
+  [[nodiscard]] Value *val(unsigned i = 0) const { assert(i < operands.size()); return operands[i]; }
+  [[nodiscard]] Value *ret(unsigned i = 0) const { assert(i < results.size()); return results[i]; }
 
   template<class T> __requires((std::derived_from<T, Attr>))
   const T *get() const {
@@ -210,6 +212,15 @@ public:
     std::string name(T::getMnemonics());
     attrs.erase(name);
   }
+
+  template<class T> __requires((std::derived_from<T, Op>))
+  T *getParentOfType() const {
+    for (auto p = getParentOp(); p; p = p->getParentOp()) {
+      if (auto x = dyn_cast<T>(p))
+        return x;
+    }
+    return nullptr;
+  }
 };
 
 
@@ -226,12 +237,11 @@ public:
     Op *const def;
     Block *const bb;
   };
-  const int index;
   const bool opResult;
   const auto &getUses() const { return uses; }
 
-  Value(const Type *type, Op *def, int index): type(type), def(def), index(index), opResult(true) {}
-  Value(const Type *type, Block *bb, int index): type(type), bb(bb), index(index), opResult(false) {}
+  Value(const Type *type, Op *def): type(type), def(def), opResult(true) {}
+  Value(const Type *type, Block *bb): type(type), bb(bb), opResult(false) {}
 
   void replaceAllUsesWith(Value *other);
   template<class F> __requires((requires(const F &f) {
@@ -349,6 +359,7 @@ public:
   const auto &getArgs() const { return args; }
   auto &getArgs() { return args; }
   void clearArgs() { args.clear(); }
+  unsigned getArgIndex(const Value *v) const;
 
   bool dominatedBy(const Block *bb) const;
   bool dominates(const Block *bb) const { return bb->dominatedBy(this); }

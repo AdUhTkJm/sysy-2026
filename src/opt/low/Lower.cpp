@@ -38,6 +38,7 @@ void Lower::runImpl(FuncOp *func) {
   rename(NeOp, CmpNeOp);
   rename(LtOp, CmpLtOp);
   rename(LeOp, CmpLeOp);
+  rename(AndIOp, AndWOp);
   
   for_all(NotOp, func) {
     builder.setBefore(op);

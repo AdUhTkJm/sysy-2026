@@ -29,6 +29,14 @@ static Rule rules[] = {
 
 #define cvt(A, B) cvt_impl(A, B) cvt_impl(B, A)
 
+#define every(f) \
+  for (auto bb : *region) \
+    for (auto it = bb->begin(); it != bb->end();) { \
+      auto next = it; ++next; \
+      f(*it); \
+      it = next; \
+    }
+
 static Op *flip(Op *op) {
   Builder builder;
   cvt(CbzOp, CbnzOp)
@@ -45,6 +53,7 @@ declare_local_pass(LateLegalize,
   void prologue(FuncOp *func);
   void relocateAlloca(FuncOp *func);
   void rewriteJumps(Block *bb);
+  void ensureImmRange(Op *op);
 ) {
   ensureSingleReturn(func);
   prologue(func);
@@ -53,6 +62,8 @@ declare_local_pass(LateLegalize,
   auto region = func->getRegion();
   for (auto bb : *region)
     rewriteJumps(bb);
+
+  every(ensureImmRange)
 }
 
 void LateLegalize::ensureSingleReturn(FuncOp *func) {
@@ -158,8 +169,18 @@ void LateLegalize::relocateAlloca(FuncOp *func) {
   auto region = func->getRegion();
 
   // We allocate shorter allocas first, so that more allocas can fit in immediate range of `ldr`.
-  std::sort(allocas.begin(), allocas.end(), [](AllocaOp *l, AllocaOp *r) {
-    return asmSize(l) < asmSize(r);
+  std::unordered_map<AllocaOp*, int> priority;
+  for (auto x : allocas)
+    priority[x] = -asmSize(x);
+
+  // We always prioritze ldps and stps, so that they fall in the range of [-512, 504].
+  for_all(LdpOp, func)
+    priority[cast<AllocaOp>(op->val(0)->def)] += 0x3000'0000;
+  for_all(StpOp, func)
+    priority[cast<AllocaOp>(op->val(0)->def)] += 0x3000'0000;
+
+  std::sort(allocas.begin(), allocas.end(), [&](AllocaOp *l, AllocaOp *r) {
+    return priority[l] > priority[r];
   });
 
   int total = 0;
@@ -169,10 +190,6 @@ void LateLegalize::relocateAlloca(FuncOp *func) {
   Builder builder;
   builder.setToStart(region);
   auto rd = createAssignedRd(builder, sp);
-  // Sort by alloca size, smallest first.
-  std::sort(allocas.begin(), allocas.end(), [](AllocaOp *l, AllocaOp *r) {
-    return asmSize(l) < asmSize(r);
-  });
   for (auto alloca : allocas) {
     int sz = asmSize(alloca);
 
@@ -267,6 +284,29 @@ void LateLegalize::rewriteJumps(Block *bb) {
   builder.setAfter(op);
   setElse(op, nullptr);
   builder.create<BOp>()->target = other;
+}
+
+#define imm_range_list(X) \
+  X(LdrOp, -16384, 16380) X(StrOp, -16384, 16380)
+
+// Warning: this is actually erratic.
+#define rewrite_imm_range(Ty, l, r) \
+  if (auto x = dyn_cast<Ty>(op)) { \
+    if (x->value <= r && x->value >= l) \
+      return; \
+    builder.setBefore(op); \
+    auto val = x->val(0); \
+    auto addx = builder.create<AddXIOp>(val->type)->with(val); \
+    assignment[addx->ret()] = scratch[0]; \
+    addx->value = x->value; \
+    x->value = 0; \
+    x->setOperand(0, addx->ret()); \
+    return; \
+  }
+
+void LateLegalize::ensureImmRange(Op *op) {
+  Builder builder;
+  imm_range_list(rewrite_imm_range);
 }
 
 }

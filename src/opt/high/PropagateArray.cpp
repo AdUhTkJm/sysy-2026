@@ -67,8 +67,8 @@ declare_pass(PropagateArray) {
           // After cloning, replace the i'th argument to `val`.
           builder.setToStart(fn->getRegion());
           auto newg = builder.create<GetGlobalOp>(g->ret()->type)->with(global);
-          fn->getArg(i - 1)->replaceAllUsesWith(newg->ret());
-          fn->removeResult(i - 1);
+          fn->ret(i)->replaceAllUsesWith(newg->ret());
+          fn->removeResult(i);
         }
 
         // For the call instance, remove the i'th argument (i+1'th operand),

@@ -22,7 +22,7 @@ public: \
   X(AddWOp) X(AddXOp) X(MaddWOp) X(MsubWOp) \
   X(SubWOp) X(SubXOp) X(MulWOp) X(MulXOp) \
   X(DivWOp) X(DivXOp) X(CmpEqOp) X(CmpNeOp) X(CmpLtOp) X(CmpLeOp) \
-  X(RetOp) X(EorWOp) X(LslWOp) \
+  X(RetOp) X(EorWOp) X(LslWOp) X(AndWOp) X(AndXOp) \
 
 #define terminator_list(X) \
   X(ReturnOp) X(BreakOp) X(ContinueOp) X(YieldOp)
@@ -45,7 +45,7 @@ public: \
   X(AddWIOp) X(AddXIOp) X(AddWLslOp) X(AddXLslOp) \
   X(MovIOp) X(LdrOp) X(StrOp) X(LdpOp) X(StpOp) \
   X(EorWIOp) X(LdrLslOp) X(StrLslOp) X(LslWIOp) \
-  X(SubWIOp) X(SubXIOp)
+  X(SubWIOp) X(SubXIOp) X(AndWIOp) X(AndXIOp) 
 
 #define arm_mem_op_list(X) \
   X(LdrOp) X(StrOp) X(LdpOp) X(StpOp)
@@ -184,10 +184,10 @@ op(BlOp,
   std::string name;
 );
 op(WriteRegOp,
-  int reg;
+  unsigned long reg;
 );
 op(ReadRegOp,
-  int reg;
+  unsigned long reg;
 );
 op(AdrpOp,
   std::string name;

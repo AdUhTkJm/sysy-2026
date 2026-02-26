@@ -7,10 +7,8 @@ namespace opt {
 declare_pass(Print) {
   for (auto [v, r] : assignment) {
     std::string name = regname(r);
-    if (v->type == i32) {
-      assert(name[0] == 'x');
+    if (v->type == i32)
       name[0] = 'w';
-    }
 
     printer.addIdent(v, name);
   }

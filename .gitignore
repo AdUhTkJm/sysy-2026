@@ -4,3 +4,4 @@ test/
 .cache/
 temp/
 *.s
+output.txt

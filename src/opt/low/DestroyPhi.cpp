@@ -1,4 +1,5 @@
 #include "Common.h"
+#include <algorithm>
 #include <queue>
 
 namespace opt {
@@ -6,6 +7,7 @@ namespace opt {
 declare_local_pass(DestroyPhi,
   void splitCriticalEdge(Region *region);
   void lowerPhi(Block *bb);
+  void spill(Value *v);
 ) {
   auto region = func->getRegion();
   
@@ -14,6 +16,38 @@ declare_local_pass(DestroyPhi,
 
   for (auto bb : *region)
     lowerPhi(bb);
+
+  for (auto bb : *region) {
+    std::vector<Value*> toSpill;
+    for (auto op : *bb) {
+      std::copy_if(
+        op->getResults().begin(), op->getResults().end(),
+        std::back_inserter(toSpill), [&](Value *v) {
+          return assignment[v] > reg_end;
+        }
+      );
+    }
+    for (auto v : toSpill)
+      spill(v);
+  }
+}
+
+void DestroyPhi::spill(Value *v) {
+  Builder builder;
+  auto alloca = (AllocaOp *) (unsigned long) assignment[v];
+  for (auto it = v->getUses().begin(); it != v->getUses().end();) {
+    auto next = it; next++;
+    Op *use = *it;
+    builder.setBefore(use);
+    auto ld = builder.create<LdrOp>(v->type)->with(alloca->ret());
+    assignment[ld->ret()] = scratch[use->getOperandIndex(v)];
+    use->replaceOperand(v, ld->ret());
+    it = next;
+  }
+
+  builder.setAfter(v->def);
+  builder.create<StrOp>()->with(alloca->ret(), v);
+  assignment[v] = scratch[v->def->getResultIndex(v)];
 }
 
 void DestroyPhi::splitCriticalEdge(Region *region) {
@@ -59,10 +93,22 @@ void DestroyPhi::lowerPhi(Block *bb) {
   for (auto pred : bb->preds) {
     Builder builder(pred->getLastOp());
     const auto &emitCopy = [&](Reg src, Reg dst, const Type *ty) {
-      auto rd = createAssignedRd(builder, src, ty);
+      Value *rd;
+      if (src < reg_end)
+        rd = createAssignedRd(builder, src, ty)->ret();
+      else {
+        auto alloca = (AllocaOp *) (unsigned long) src;
+        rd = builder.create<LdrOp>(ty)->with(alloca->ret())->ret();
+        assignment[rd] = scratch[0];
+      }
 
-      auto wr = builder.create<WriteRegOp>()->with(rd->ret());
-      wr->reg = dst;
+      if (dst < reg_end) {
+        auto wr = builder.create<WriteRegOp>()->with(rd);
+        wr->reg = dst;
+      } else {
+        auto alloca = (AllocaOp *) (unsigned long) dst;
+        builder.create<StrOp>()->with(alloca->ret(), rd);
+      }
     };
 
     // Maps dst to src.
@@ -128,12 +174,12 @@ void DestroyPhi::lowerPhi(Block *bb) {
       } while (cur != start);
 
       // Remove the cycle with the scratch register.
-      emitCopy(copy[start].first, scratch, ty);
+      emitCopy(copy[start].first, scratch[0], ty);
       for (int i = (int) cycle.size() - 1; i > 0; --i) {
         auto [dst, ty] = cycle[i];
         emitCopy(copy[dst].first, dst, ty);
       }
-      emitCopy(scratch, start, ty);
+      emitCopy(scratch[0], start, ty);
 
       // Delete the cycle from the registers.
       for (auto r : cycle)
@@ -145,8 +191,25 @@ void DestroyPhi::lowerPhi(Block *bb) {
   Builder builder;
   for (auto phi : phis) {
     builder.setBefore(phi);
-    auto rd = createAssignedRd(builder, assignment[phi->ret()], phi->ret()->type);
-    phi->ret()->replaceAllUsesWith(rd->ret());
+
+    auto v = phi->ret();
+    auto reg = assignment[v];
+
+    if (reg < reg_end) {
+      auto rd = createAssignedRd(builder, assignment[v], v->type);
+      v->replaceAllUsesWith(rd->ret());
+    } else {
+      auto alloca = (AllocaOp *) (unsigned long) reg;
+      for (auto it = v->getUses().begin(); it != v->getUses().end();) {
+        auto next = it; next++;
+        Op *use = *it;
+        builder.setBefore(use);
+        auto ld = builder.create<LdrOp>(v->type)->with(alloca->ret());
+        assignment[ld->ret()] = scratch[use->getOperandIndex(v)];
+        use->replaceOperand(v, ld->ret());
+        it = next;
+      }
+    }
     phi->erase();
   }
 }

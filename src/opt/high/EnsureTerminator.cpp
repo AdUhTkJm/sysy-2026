@@ -46,7 +46,6 @@ declare_pass(EnsureTerminator,
     part_container_list(init)
     loop_with(BreakOp, removeBreak);
     loop_with(ContinueOp, removeContinue);
-    std::cout << "continue size: " << ContinueOps.size() << "\n";
   } while (!(part_container_list(container_empty) true));
 
   for_all(CondMarkerOp)
@@ -85,7 +84,31 @@ void EnsureTerminator::removeRedundant(Op *op) {
 }
 
 void EnsureTerminator::removeBreak(BreakOp *op) {
-  (void) op; assert(false && "NYI");
+  Builder builder;
+  auto loop = op->getParentOfType<DoWhileOp>();
+
+  // Create a new bool value as loop condition, and set it to 1.
+  builder.setToStart(loop->getParentBlock());
+  auto var = builder.create<AllocaOp>(Type::pointer(i32));
+  auto one = builder.createInt(1);
+  builder.create<StoreOp>()->with(var->ret(), one->ret());
+
+  // Make sure the variable is included for the loop condition.
+  auto cond = cast<ConditionOp>(loop->getRegion()->getLastOp());
+  auto val = cond->val();
+
+  builder.setBefore(cond);
+  auto ld = builder.create<LoadOp>(i32)->with(var->ret());
+  auto andop = builder.create<AndIOp>(i32)->with(val, ld->ret());
+  cond->setOperand(0, andop->ret());
+
+  // Before the break, we set the bool variable to zero.
+  builder.setBefore(op);
+  auto zero = builder.createInt(0);
+  builder.create<StoreOp>()->with(var->ret(), zero->ret());
+
+  // Replace the break with continue since it skips rest of the block.
+  builder.rename<ContinueOp>(op);
 }
 
 void EnsureTerminator::removeContinue(ContinueOp *op) {
@@ -119,7 +142,7 @@ void EnsureTerminator::removeContinue(ContinueOp *op) {
       // Now both continues become normal yields.
       container_name(ContinueOp).erase(cont);
       container_name(ContinueOp).erase(op);
-      
+
       builder.replace<YieldOp>(last);
       builder.replace<YieldOp>(op);
       return;

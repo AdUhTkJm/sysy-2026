@@ -15,18 +15,12 @@ bool conflict(const Type *a, const Type *b) {
   return regbank(a) == regbank(b);
 }
 
-void spill(Value *v, Region *region) {
+void spill(Value *v, Region *region, int i) {
+  assert(i < 3);
   Builder builder;
   builder.setToStart(region);
   auto alloca = builder.create<AllocaOp>(Type::pointer(v->type));
-  for (auto it = v->getUses().begin(); it != v->getUses().end();) {
-    auto next = it; next++;
-    Op *use = *it;
-    builder.setBefore(use);
-    auto ld = builder.create<LdrOp>(v->type)->with(alloca->ret());
-    use->replaceOperand(v, ld->ret());
-    it = next;
-  }
+  assignment[v] = (Reg) (unsigned long) alloca;
 }
 
 }
@@ -36,10 +30,9 @@ namespace opt {
 declare_pass(RegAlloc,
   void runImpl(Region *region, bool isLeaf);
   void markBlockConflict(Block *bb);
-  bool allocate(Block *bb, bool isLeaf);
+  void allocate(Block *bb, bool isLeaf);
   void clearState();
 
-  std::unordered_map<Value*, Reg> tmpReg;
   // Interference map.
   std::unordered_map<Value*, std::set<Value*>> interf;
   // Values of readreg, or operands of writereg, or phis (mvs), are prioritized.
@@ -78,7 +71,7 @@ void RegAlloc::markBlockConflict(Block *bb) {
 
       // Precolor.
       if (auto wr = dyn_cast<WriteRegOp>(op)) {
-        tmpReg[v] = (Reg) wr->reg;
+        assignment[v] = (Reg) wr->reg;
         priority[v] = 1;
       }
       if (isa<ReadRegOp>(op))
@@ -144,21 +137,19 @@ void RegAlloc::markBlockConflict(Block *bb) {
   }
 }
 
-bool RegAlloc::allocate(Block *bb, bool isLeaf) {
+void RegAlloc::allocate(Block *bb, bool isLeaf) {
   const Reg *order = isLeaf ? leafOrder : normalOrder;
   const Reg *orderf = isLeaf ? leafOrderf : normalOrderf;
 
   for (auto op : *bb) {
     for (auto v : op->getResults()) {
-      if (tmpReg.count(v) || assignment.count(v))
+      if (assignment.count(v))
         continue;
 
       std::set<Reg> bad, unpreferred;
 
       for (auto z : interf[v]) {
         // In the whole function, `sp` and `zero` are read-only.
-        if (tmpReg.count(z) && tmpReg[z] != sp && tmpReg[z] != xzr)
-          bad.insert(tmpReg[z]);
         if (assignment.count(z) && assignment[z] != sp && assignment[z] != xzr)
           bad.insert(assignment[z]);
       }
@@ -168,8 +159,6 @@ bool RegAlloc::allocate(Block *bb, bool isLeaf) {
         const auto &operands = phiOperand[v];
         for (auto x : operands) {
           for (auto v : interf[x]) {
-            if (tmpReg.count(v) && tmpReg[v] != sp && tmpReg[v] != xzr)
-              unpreferred.insert(tmpReg[v]);
             if (assignment.count(v) && assignment[v] != sp && assignment[v] != xzr)
               unpreferred.insert(assignment[v]);
           }
@@ -179,13 +168,8 @@ bool RegAlloc::allocate(Block *bb, bool isLeaf) {
       if (prefer.count(v)) {
         auto ref = prefer[v];
         // Try to allocate the same register as `ref`.
-        if (tmpReg.count(ref) && !bad.count(tmpReg[ref])) {
-          tmpReg[v] = tmpReg[ref];
-          continue;
-        }
-        // Try to allocate the same register as `ref`.
         if (assignment.count(ref) && !bad.count(assignment[ref])) {
-          tmpReg[v] = assignment[ref];
+          assignment[v] = assignment[ref];
           continue;
         }
       }
@@ -208,7 +192,7 @@ bool RegAlloc::allocate(Block *bb, bool isLeaf) {
       }
 
       if (preferred != -1) {
-        tmpReg[v] = (Reg) preferred;
+        assignment[v] = (Reg) preferred;
         continue;
       }
 
@@ -218,21 +202,16 @@ bool RegAlloc::allocate(Block *bb, bool isLeaf) {
 
       for (int i = 0; i < rn; i++) {
         if (!bad.count(regs[i])) {
-          tmpReg[v] = (Reg) regs[i];
+          assignment[v] = (Reg) regs[i];
           break;
         }
       }
 
       // The value must be spilled.
-      if (!tmpReg.count(v)) {
-        spill(v, bb->getParentRegion());
-        std::cout << "spilled value: " << v->def << "\n";
-        return false;
-      }
+      if (!assignment.count(v))
+        spill(v, bb->getParentRegion(), op->getOperandIndex(v));
     }
   }
-
-  return true;
 }
 
 void RegAlloc::clearState() {
@@ -240,22 +219,16 @@ void RegAlloc::clearState() {
   priority.clear();
   prefer.clear();
   phiOperand.clear();
-  tmpReg.clear();
 }
 
 void RegAlloc::runImpl(Region *region, bool isLeaf) {
   region->updateLiveness();
 
-  bool success;
-  do {
-    success = true;
-    clearState();
-    for (auto bb : region->getBlocks())
-      markBlockConflict(bb);
-    for (auto bb : region->getBlocks())
-      success &= allocate(bb, isLeaf);
-  } while (!success);
-  assignment.insert(tmpReg.begin(), tmpReg.end());
+  clearState();
+  for (auto bb : region->getBlocks())
+    markBlockConflict(bb);
+  for (auto bb : region->getBlocks())
+    allocate(bb, isLeaf);
   for_all(BlOp, region->getParentOp())
     op->clearResults();
 }

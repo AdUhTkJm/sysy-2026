@@ -19,7 +19,8 @@ struct Env {
 };
 
 #define action_list(X) \
-  X(add, +) X(sub, -) X(mul, *) X(div, /) X(mod, %)
+  X(add, +) X(sub, -) X(mul, *) X(div, /) X(mod, %) \
+  X(lt, <) X(le, <=) X(eq, ==) X(ne, !=)
 
 #define action_decl(Ty, ...) Ty, 
 enum class ActionKind {

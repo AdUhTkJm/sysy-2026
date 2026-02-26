@@ -165,7 +165,7 @@ bool InstCombine::rewriteMul(Op *op, Value *v, int mul) const {
     int ctz1 = __builtin_ctz(mul);
 
     builder.setBefore(op);
-    auto add = builder.create<AddWLslOp>()->with(v, v);
+    auto add = builder.create<AddWLslOp>(ty)->with(v, v);
     add->value = ctz1 - ctz0;
 
     auto lsl = builder.replace<LslWIOp>(op, ty)->with(add->ret());

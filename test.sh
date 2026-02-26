@@ -139,6 +139,12 @@ if [[ -n $testcase ]]; then
   if [[ -n $interpret ]]; then
     cmd="$cmd --interpret"
   fi
+  infile=${name/.sy/.in}
+  if [[ -f $infile ]]; then
+    cmd="$cmd < $infile"
+    echo "input from: $infile"
+  fi
+
   eval "ASAN_OPTIONS=detect_leaks=0 $cmd"
   check $? "hcc"  
   echo compiled.

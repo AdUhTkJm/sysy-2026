@@ -33,18 +33,18 @@ int strcmp_nocase(const char *l, const char *r) {
 void PassManager::run() {
   for (auto pass : passes) {
     if (options.printAll || !strcmp_nocase(options.printBefore.c_str(), pass->name()))
-      std::cout << module;
+      std::cerr << module;
     
     pass->run();
 
     if (options.printAll || !strcmp_nocase(options.printAfter.c_str(), pass->name()))
-      std::cout << module;
+      std::cerr << module;
 
     if (options.interpret) {
       Interpreter interp;
       ExecResult res = interp.execute(module);
       assert(res.values.size() == 1 && res.kind == ExecResult::Return);
-      std::cout << res.values[0].vi << "\n";
+      std::cerr << res.values[0].vi << "\n";
     }
   }
 }

@@ -23,9 +23,11 @@ declare_local_pass(LowerPostSchedule) {
     builder.setAfter(op);
     if (op->getNumResults() > 0) {
       auto ret = op->ret();
-      auto rd = builder.create<ReadRegOp>(ret->type);
-      rd->reg = x0;
-      ret->replaceAllUsesWith(rd->ret());
+      if (ret->type != unit) {
+        auto rd = builder.create<ReadRegOp>(ret->type);
+        rd->reg = x0;
+        ret->replaceAllUsesWith(rd->ret());
+      }
       op->clearResults();
     }
 

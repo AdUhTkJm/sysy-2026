@@ -94,10 +94,17 @@ Value *CodeGen::emitExpr(ASTNode *node) {
 
   if (auto ref = dyn_cast<VarRefNode>(node)) {
     Value *addr;
-    if (!table.count(ref->name))
+    if (!table.count(ref->name)) {
       addr = getGlobal(ref->name);
-    else
+      if (globals[ref->name]->def->has<DimAttr>())
+        return addr;
+    } else {
       addr = table[ref->name];
+      // We're directly referring to an array.
+      if (addr->def->has<DimAttr>())
+        return addr;
+    }
+
     return builder.create<LoadOp>(addr->type->pointee())->with(addr)->ret();
   }
 

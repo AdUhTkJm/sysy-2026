@@ -31,7 +31,7 @@ void Builder::setToEnd(Block *block) {
 
 IntOp *Builder::createInt(int i) {
   auto op = new IntOp(bb, at);
-  op->results.push_back(new Value(i32, op, 0));
+  op->results.push_back(new Value(i32, op));
   op->value = i;
   insert(op);
   return op;
@@ -39,7 +39,7 @@ IntOp *Builder::createInt(int i) {
 
 FloatOp *Builder::createFloat(float f) {
   auto op = new FloatOp(bb, at);
-  op->results.push_back(new Value(f32, op, 0));
+  op->results.push_back(new Value(f32, op));
   op->value = f;
   insert(op);
   return op;
