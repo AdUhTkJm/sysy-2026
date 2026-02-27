@@ -63,6 +63,15 @@ protected:
     return result;
   }
 
+  template<>
+  std::vector<ir::Op*> collectOps(ir::Op *root) const {
+    std::vector<ir::Op*> result;
+    walk(root, [&](ir::Op *op) {
+      result.push_back(op);
+    });
+    return result;
+  }
+
   template<class T>
   // Note: this only traverses a single layer.
   std::vector<T*> collectOps(ir::Block *bb) const {
@@ -93,6 +102,8 @@ protected:
   CallGraph calledGraph() const;
   // u -> v means `u` calls `v`.
   CallGraph callGraph() const;
+
+  void checkAssignmentLegality(ir::Op *parent) const;
 public:
   virtual void run() = 0;
   virtual const char *name() = 0;
@@ -101,6 +112,10 @@ public:
 
 class PassManager {
   std::vector<Pass*> passes;
+  std::map<const char *, int> time;
+  
+  bool shouldPrintBefore(const char *name) const;
+  bool shouldPrintAfter(const char *name) const;
 public:
   ir::ModuleOp *const module;
   
@@ -136,10 +151,17 @@ public:
   pm.addPass(opt::make##Ty(pm.module))
 
 #define fixed(...) \
-  { bool __changed; do { __changed = false; __VA_ARGS__ } while (__changed); }
+  { \
+    bool __changed; int __index = 0; \
+    do { __changed = false; if (__index > 100) assert(false && "fixed does not converge"); __VA_ARGS__ } \
+    while (++__index, __changed); \
+  }
 
 #define mark_changed \
   __changed = true
+
+#define mark_changed_if(...) \
+  __changed |= (__VA_ARGS__)
 
 #define for_all(Ty, ...) \
   for (auto op : collectOps<Ty>(__VA_ARGS__))

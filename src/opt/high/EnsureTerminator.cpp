@@ -2,11 +2,14 @@
 
 namespace opt {
 
-#define container_list(X) \
-  X(IfOp) X(DoWhileOp) X(BreakOp) X(ContinueOp)
-
-#define part_container_list(X) \
+#define terminator_container_list(X) \
   X(BreakOp) X(ContinueOp)
+
+#define region_container_list(X) \
+  X(IfOp) X(DoWhileOp)
+
+#define container_list(X) \
+  terminator_container_list(X) region_container_list(X)
 
 #define container_name(Ty) \
   Ty##s
@@ -18,6 +21,13 @@ namespace opt {
   for (auto it = container_name(Ty).begin(); it != container_name(Ty).end(); ) { \
     auto op = *it; \
     function(op); \
+    it = container_name(Ty).upper_bound(op); \
+  }
+
+#define loop_and_mark_changed(Ty, function) \
+  for (auto it = container_name(Ty).begin(); it != container_name(Ty).end(); ) { \
+    auto op = *it; \
+    mark_changed_if(function(op)); \
     it = container_name(Ty).upper_bound(op); \
   }
 
@@ -34,6 +44,9 @@ declare_pass(EnsureTerminator,
   void removeContinue(ContinueOp *op);
   void removeBreak(BreakOp *op);
   void removeRedundant(Op *op);
+
+  bool canonicalizeReturn(IfOp *op);
+  bool canonicalizeReturn(DoWhileOp *op);
   void erase(Op *op);
 
   container_list(container_of)
@@ -43,10 +56,15 @@ declare_pass(EnsureTerminator,
   loop_with(DoWhileOp, removeRedundant);
 
   do {
-    part_container_list(init)
+    terminator_container_list(init)
     loop_with(BreakOp, removeBreak);
     loop_with(ContinueOp, removeContinue);
-  } while (!(part_container_list(container_empty) true));
+  } while (!(terminator_container_list(container_empty) true));
+
+  fixed(
+    loop_and_mark_changed(IfOp, canonicalizeReturn);
+    loop_and_mark_changed(DoWhileOp, canonicalizeReturn);
+  );
 
   for_all(CondMarkerOp)
     op->erase();
@@ -179,6 +197,82 @@ void EnsureTerminator::removeContinue(ContinueOp *op) {
       x = next;
     }
   }
+}
+
+bool EnsureTerminator::canonicalizeReturn(IfOp *op) {
+  auto l = op->getRegion(0), r = op->getRegion(1);
+  auto lastL = l->getLastOp(), lastR = r->getLastOp();
+  bool rl = isa<ReturnOp>(lastL), rr = isa<ReturnOp>(lastR);
+  if (rl && rr) {
+    // Both ends are returns, so we can remove everything till the CondMarker,
+    // if that exists.
+    for (Op *x = op->nextOp(); x && !isa<CondMarkerOp>(x);) {
+      auto next = x->nextOp();
+      x->clearOperands();
+      x = next;
+    }
+    for (Op *x = op->nextOp(); x && !isa<CondMarkerOp>(x);) {
+      auto next = x->nextOp();
+      erase(x);
+      x = next;
+    }
+
+    // Replace both ends with yield, and put return to the outer region.
+    Builder builder;
+    assert(lastL->getNumOperands() == lastR->getNumOperands());
+    auto q = builder.rename<YieldOp>(lastL);
+    builder.rename<YieldOp>(lastR);
+
+    builder.setAfter(op);
+    auto ret = builder.create<ReturnOp>();
+    for (unsigned i = 0; i < q->getNumOperands(); i++) {
+      auto v = op->pushResult(q->val(i)->type);
+      ret->pushOperand(v);
+    }
+    return true;
+  }
+
+  if (!rr && !rl)
+    return false;
+
+  if (rr)
+    std::swap(l, r);
+
+  // Now `l` has a ReturnOp at the end, and `r` does not.
+  // We move out everything in `r`.
+  auto bb = r->getFirstBlock();
+  for (Op *x = bb->getFirstOp(), *prev = op; x && !isa<YieldOp>(x);) {
+    auto next = x->nextOp();
+    x->moveAfter(prev);
+    prev = x;
+    x = next;
+  }
+  // Note that even though we changed, we haven't produced a new ReturnOp anywhere.
+  // Therefore this change shouldn't cause a new round of loop.
+  return false;
+}
+
+bool EnsureTerminator::canonicalizeReturn(DoWhileOp *op) {
+  // If the return is directly put inside a while, then this means
+  // the while can be completely removed: it will only be executed once.
+  auto bb = op->getRegion()->getFirstBlock();
+  bool hasReturn = false;
+  for (auto x : *bb) {
+    if (isa<ReturnOp>(x)) {
+      hasReturn = true;
+      break;
+    }
+  }
+  if (!hasReturn)
+    return false;
+
+  for (auto x = bb->getFirstOp(); x && !isa<CondMarkerOp>(x) && !isa<ReturnOp>(x);) {
+    auto next = x->nextOp();
+    x->moveBefore(op);
+    x = next;
+  }
+  erase(op);
+  return true;
 }
 
 }

@@ -30,14 +30,30 @@ int strcmp_nocase(const char *l, const char *r) {
   return *p ? 1 : *q ? -1 : 0;
 }
 
+bool PassManager::shouldPrintBefore(const char *name) const {
+  return options.printAll ||
+    (!strcmp_nocase(options.printBefore.c_str(), name) &&
+    (options.beforeIndex == 0 || options.beforeIndex == time.at(name)));
+}
+
+bool PassManager::shouldPrintAfter(const char *name) const {
+  return options.printAll ||
+    (!strcmp_nocase(options.printAfter.c_str(), name) &&
+    (options.afterIndex == 0 || options.afterIndex == time.at(name)));
+}
+
 void PassManager::run() {
   for (auto pass : passes) {
-    if (options.printAll || !strcmp_nocase(options.printBefore.c_str(), pass->name()))
+    auto name = pass->name();
+    time[name]++;
+    if (options.printAll)
+      std::cerr << "===== " << name << " =====\n";
+    if (shouldPrintBefore(name))
       std::cerr << module;
     
     pass->run();
 
-    if (options.printAll || !strcmp_nocase(options.printAfter.c_str(), pass->name()))
+    if (shouldPrintAfter(name))
       std::cerr << module;
 
     if (options.interpret) {
@@ -118,6 +134,20 @@ Pass::CallGraph Pass::callGraph() const {
       cg[fn].insert(cast<FuncOp>(op->val()->def));
   }
   return cg;
+}
+
+void Pass::checkAssignmentLegality(Op *parent) const {
+  walk(parent, [](Op *op) {
+    if (isa<GlobalOp>(op) || isa<FuncOp>(op) || isa<AllocaOp>(op))
+      return;
+
+    for (auto v : op->getResults()) {
+      if (!assignment.count(v) || assignment[v] == unallocated) {
+        std::cerr << "unallocated: " << op;
+        assert(false);
+      }
+    }
+  });
 }
 
 }

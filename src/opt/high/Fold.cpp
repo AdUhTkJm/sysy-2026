@@ -7,6 +7,10 @@ namespace opt {
 
 static Rule rules[] = {
   Rule("(addi (int 'a) (int 'b))") >> "(int:i32 (!add 'a 'b))",
+  Rule("(subi (int 'a) (int 'b))") >> "(int:i32 (!sub 'a 'b))",
+  Rule("(muli (int 'a) (int 'b))") >> "(int:i32 (!mul 'a 'b))",
+  Rule("(divi (int 'a) (int 'b))") >> "(int:i32 (!div 'a 'b))",
+  Rule("(modi (int 'a) (int 'b))") >> "(int:i32 (!mod 'a 'b))",
   Rule("(lt (int 'a) (int 'b))") >> "(int:i32 (!lt 'a 'b))",
   Rule("(le (int 'a) (int 'b))") >> "(int:i32 (!le 'a 'b))",
   Rule("(eq (int 'a) (int 'b))") >> "(int:i32 (!eq 'a 'b))",

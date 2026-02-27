@@ -8,8 +8,9 @@ declare_local_pass(LowerPostSchedule) {
   for_all(BlOp, func) {
     builder.setBefore(op);
     int args = 0, fargs = 0;
-    for (auto val : op->getOperands()) {
-      auto wr = builder.create<WriteRegOp>()->with(val);
+    for (unsigned i = 0; i < op->getNumOperands(); i++) {
+      auto val = op->val(i);
+      auto wr = builder.create<WriteRegOp>(unit)->with(val);
       if (regbank(val->type) == INT) {
         assert(args < 8); // TODO
         wr->reg = argRegs[args++];
@@ -17,6 +18,10 @@ declare_local_pass(LowerPostSchedule) {
         assert(fargs < 8); // TODO
         wr->reg = fargRegs[fargs++];
       }
+      // We ensure that other arguments won't collide with this register that
+      // we desire.
+      // We don't remove them since they won't be printed out.
+      assignment[wr->ret()] = (Reg) wr->reg;
     }
     op->clearOperands();
     

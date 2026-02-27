@@ -162,14 +162,19 @@ bool InstCombine::rewriteMul(Op *op, Value *v, int mul) const {
     //   add %0, v, v, lsl #(ctz1 - ctz0);
     //   lsl %1, %0, #ctz0
     int ctz0 = __builtin_ctz(mul);
-    int ctz1 = __builtin_ctz(mul);
+    int ctz1 = __builtin_ctz(mul - (1 << ctz0));
 
     builder.setBefore(op);
     auto add = builder.create<AddWLslOp>(ty)->with(v, v);
     add->value = ctz1 - ctz0;
 
-    auto lsl = builder.replace<LslWIOp>(op, ty)->with(add->ret());
-    lsl->value = ctz0;
+    if (ctz0 != 0) {
+      auto lsl = builder.replace<LslWIOp>(op, ty)->with(add->ret());
+      lsl->value = ctz0;
+    } else {
+      op->ret()->replaceAllUsesWith(add->ret());
+      op->erase();
+    }
     return true;
   }
 

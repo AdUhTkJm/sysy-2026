@@ -59,14 +59,24 @@ while [[ $# -gt 0 ]] do
     if [[ $# -lt 2 ]]; then
       die "expected test case name"
     fi
+    v=2
+    if [[ $# -ge 3 && $3 =~ '^[0-9]+$' ]]; then
+      printbeforeIndex=" $3"
+      v=3
+    fi
     printbefore="$2"
-    shift 2;;
+    shift $v;;
   -q|--print-after)
     if [[ $# -lt 2 ]]; then
       die "expected test case name"
     fi
+    v=2
+    if [[ $# -ge 3 && $3 =~ '^[0-9]+$' ]]; then
+      printafterIndex=" $3"
+      v=3
+    fi
     printafter="$2"
-    shift 2;;
+    shift $v;;
   --pt|--print-type|--types)
     printtype=1
     shift;;
@@ -122,10 +132,10 @@ if [[ -n $testcase ]]; then
     cmd="gdb --args $cmd"
   fi
   if [[ -n $printbefore ]]; then
-    cmd="$cmd --print-before $printbefore"
+    cmd="$cmd --print-before $printbefore$printbeforeIndex"
   fi
   if [[ -n $printafter ]]; then
-    cmd="$cmd --print-after $printafter"
+    cmd="$cmd --print-after $printafter$printafterIndex"
   fi
   if [[ -n $printtype ]]; then
     cmd="$cmd --print-type"

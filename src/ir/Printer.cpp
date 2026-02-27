@@ -251,6 +251,11 @@ printer(MovIOp) {
   os << "mov " << printer->str(op->ret()) << ", #" << movi->value;
 }
 
+printer(MovKOp) {
+  auto movk = cast<MovKOp>(op);
+  os << "movk " << printer->str(op->ret()) << ", #" << movk->value << ", lsl #16";
+}
+
 printer(LdrOp) {
   auto ldr = cast<LdrOp>(op);
   os << "ldr " << printer->str(op->ret()) << ", [" << printer->str(op->val()) << ", #" << ldr->value << "]";

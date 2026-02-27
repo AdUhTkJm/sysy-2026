@@ -32,6 +32,7 @@ declare_pass(RegAlloc,
   void markBlockConflict(Block *bb);
   void allocate(Block *bb, bool isLeaf);
   void clearState();
+  void checkLegality(Region *region) const;
 
   // Interference map.
   std::unordered_map<Value*, std::set<Value*>> interf;

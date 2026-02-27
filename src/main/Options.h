@@ -19,6 +19,8 @@ struct Options {
   option printAll;
   option interpret;
 
+  int beforeIndex, afterIndex;
+
   option optEnd;
 
   std::string inputFile;

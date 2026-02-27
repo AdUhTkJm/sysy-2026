@@ -116,8 +116,8 @@ void DestroyPhi::lowerPhi(Block *bb) {
     std::set<Reg> srcs;
 
     for (auto phi : phis) {
-      auto src = assignment[phi->incomingFrom(pred)];
-      auto dst = assignment[phi->ret()];
+      auto src = assignment.at(phi->incomingFrom(pred));
+      auto dst = assignment.at(phi->ret());
       if (src == dst)
         continue;
 

@@ -307,6 +307,15 @@ void LateLegalize::rewriteJumps(Block *bb) {
 void LateLegalize::ensureImmRange(Op *op) {
   Builder builder;
   imm_range_list(rewrite_imm_range);
+
+  if (auto movi = dyn_cast<MovIOp>(op); movi && (unsigned) movi->value > 0xffff) {
+    builder.setAfter(movi);
+    auto movk = builder.create<MovKOp>(i32);
+    movk->value = (unsigned) movi->value >> 16;
+    movi->value &= 0xffff;
+    assignment[movk->ret()] = assignment[movi->ret()];
+    return;
+  }
 }
 
 }

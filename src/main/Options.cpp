@@ -24,12 +24,20 @@ Options parseArgs(int argc, char **argv) {
 
     if (strcmp(argv[i], "--print-after") == 0) {
       opts.printAfter = argv[i + 1];
+      if (i + 2 < argc && '0' <= *argv[i + 2] && *argv[i + 2] <= '9') {
+        opts.afterIndex = std::atoi(argv[i + 2]);
+        i++;
+      }
       i++;
       continue;
     }
 
     if (strcmp(argv[i], "--print-before") == 0) {
       opts.printBefore = argv[i + 1];
+      if (i + 2 < argc && '0' <= *argv[i + 2] && *argv[i + 2] <= '9') {
+        opts.beforeIndex = std::atoi(argv[i + 2]);
+        i++;
+      }
       i++;
       continue;
     }

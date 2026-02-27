@@ -43,7 +43,7 @@ public: \
 
 #define arm_imm_op_list(X) \
   X(AddWIOp) X(AddXIOp) X(AddWLslOp) X(AddXLslOp) \
-  X(MovIOp) X(LdrOp) X(StrOp) X(LdpOp) X(StpOp) \
+  X(MovIOp) X(MovKOp) X(LdrOp) X(StrOp) X(LdpOp) X(StpOp) \
   X(EorWIOp) X(LdrLslOp) X(StrLslOp) X(LslWIOp) \
   X(SubWIOp) X(SubXIOp) X(AndWIOp) X(AndXIOp) 
 
@@ -69,6 +69,7 @@ public: \
 #define impure_op_list(X) \
   X(ExternCallOp) X(BranchOp) X(JumpOp) X(YieldOp) X(ConditionOp) \
   X(StoreOp) X(CallOp) X(ArrayStoreOp) X(GlobalOp) X(ReturnOp) \
+  X(FuncOp) \
   /* ARM operations */ \
   arm_branch_op_list(X) \
   X(StrOp) X(StpOp) X(BOp) X(BlOp) X(RetOp)
