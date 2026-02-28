@@ -150,7 +150,7 @@ if [[ -n $testcase ]]; then
     cmd="$cmd --interpret"
   fi
   infile=${name/.sy/.in}
-  if [[ -f $infile ]]; then
+  if [[ -f $infile && ! -n $gdb ]]; then
     cmd="$cmd < $infile"
     echo "input from: $infile"
   fi

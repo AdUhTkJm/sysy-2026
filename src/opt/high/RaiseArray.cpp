@@ -127,7 +127,7 @@ void RaiseArray::runImpl(FuncOp *func) {
 void RaiseArray::raiseRecursive(FuncOp *func) {
   Builder builder;
   int i = 0;
-  auto allocas = collectOps<AllocaOp>();
+  auto allocas = collectOps<AllocaOp>(func);
   if (allocas.empty())
     return;
 

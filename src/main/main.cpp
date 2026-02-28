@@ -20,13 +20,17 @@ void populate(opt::PassManager &pm) {
   add_pass(TidyCodeGen);
   add_pass(EnsureTerminator);
   add_pass(Mem2Reg);
-  add_pass(Fold);
   add_pass(HighDCE);
   add_pass(HighGVN);
   add_pass(HighDCE);
   add_pass(Recursive);
   add_pass(RaiseArray);
   add_pass(PropagateArray);
+  add_pass(InlineGlobalStore);
+  add_pass(HighDCE);
+  add_pass(Fold);
+  add_pass(HighGVN);
+  add_pass(HighDCE);
 
   // Mid-IR passes.
   add_pass(Flatten);

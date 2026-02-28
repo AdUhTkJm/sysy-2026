@@ -52,6 +52,9 @@ public:
 
 template<class T>
 std::ostream &operator<<(std::ostream &os, const std::vector<T> &vec) {
+  if (vec.empty())
+    return os << "<empty>";
+  
   for (size_t i = 0; i < vec.size(); i++) {
     os << vec[i];
     if (i != vec.size() - 1)

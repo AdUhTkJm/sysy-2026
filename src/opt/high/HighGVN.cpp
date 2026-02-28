@@ -7,7 +7,7 @@ namespace opt {
 #define allowed_list(X) \
   X(IntOp) X(FloatOp) X(GetGlobalOp) \
   X(AddIOp) X(SubIOp) X(MulIOp) X(DivIOp) X(ModIOp) \
-  X(AddLOp)
+  X(AddLOp) \
 
 #define allow(Ty) \
   isa<Ty>(op) ||
@@ -108,8 +108,11 @@ Key HighGVN::hash(Value *v) const {
   k.id = op->id;
   k.loc = op->getOperandIndex(v);
 
-  for (auto [i, x] : data::enumerate(op->getOperands()))
+  for (auto [i, x] : data::enumerate(op->getOperands())) {
+    if (!symbols.count(x))
+      std::cerr << "domination violated: " << v;
     k.operand.push_back(symbols.at(x));
+  }
   std::sort(k.operand.begin(), k.operand.end());
 
   if (auto i = dyn_cast<IntOp>(op))

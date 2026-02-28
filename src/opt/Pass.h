@@ -91,7 +91,24 @@ protected:
     walkImpl<T>(parent, f);
   }
 
+  template<class T> __requires((std::derived_from<T, ir::Op>))
+  bool contains(ir::Op *op) {
+    if (isa<T>(op))
+      return true;
+
+    for (auto r : op->getRegions()) {
+      for (auto bb : *r) {
+        for (auto x : *bb) {
+          if (contains<T>(x))
+            return true;
+        }
+      }
+    }
+    return false;
+  }
+
   ir::GlobalOp *findGlobal(std::string_view name) const;
+  ir::FuncOp *findFunction(std::string_view name) const;
 
   // Returns the base of the address that the operation accesses.
   // This can be either a function argument, a GlobalOp or an alloca.
@@ -102,6 +119,9 @@ protected:
   CallGraph calledGraph() const;
   // u -> v means `u` calls `v`.
   CallGraph callGraph() const;
+
+  // Retrieves the main function.
+  ir::FuncOp *findMain() const { return findFunction("main"); }
 
   void checkAssignmentLegality(ir::Op *parent) const;
 public:

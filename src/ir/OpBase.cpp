@@ -1,5 +1,6 @@
 #include "Attrs.h"
 #include "Builder.h"
+#include "Printer.h"
 
 #include <deque>
 #include <unordered_map>
@@ -187,7 +188,10 @@ void Op::insertOperand(int i, Value *v) {
 void Op::removeOperand(int i) {
   auto value = operands[i];
   operands.erase(operands.begin() + i);
-  value->uses.erase(this);
+  // Note that a direct erase() will erase all instanes.
+  auto it = value->uses.find(this);
+  assert(it != value->uses.end());
+  value->uses.erase(it);
 }
 
 void Op::removeOperand(Value *v) {
@@ -221,6 +225,10 @@ void Op::erase() {
   for (auto region : regions)
     region->erase();
   delete this;
+}
+
+void Op::dump() const {
+  std::cerr << this;
 }
 
 Block *Op::createFirstBlock() {

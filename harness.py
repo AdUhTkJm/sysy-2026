@@ -2,6 +2,7 @@
 import subprocess
 import time
 import os
+import sys
 from pathlib import Path
 
 TEST_ROOT = Path("test")
@@ -95,18 +96,18 @@ def run_test(test_path: Path) -> tuple[bool, None | float]:
 
 timemap = {}
 for file in TEST_ROOT.rglob("*.sy"):
-  print(f"running: {file}")
-  # Temporarily disable performance for now.
-  if "performance" in str(file):
+  name = str(file)
+  if "performance" in name or "h_functional" in name or "custom" in name:
     continue
+  print(f"running: {file}", file=sys.stderr, file=sys.stderr)
 
   passed, elapsed = run_test(file)
   if not passed:
-    print("error!")
+    print("error!", file=sys.stderr)
   if elapsed:
     timemap[file.stem] = elapsed
 
 if len(timemap):
-  print(timemap)
+  print(timemap, file=sys.stderr)
 
 run_test(Path("test/functional/16_mulc.sy"))

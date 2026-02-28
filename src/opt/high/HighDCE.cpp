@@ -73,5 +73,4 @@ bool HighDCE::removeWhileResults(DoWhileOp *op) {
   return unused.size();
 }
 
-
 }

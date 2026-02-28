@@ -76,31 +76,31 @@ void Mem2Reg::recurse(Op *op) {
     // Now both branches don't return. They must terminate with a yield.
     auto yl = cast<YieldOp>(l->getLastOp()), yr = cast<YieldOp>(r->getLastOp());
     valmap.clear();
+    Builder builder;
     for (auto [k, v] : left) {
       auto it = right.find(k);
-      // The value is undefined for the right branch, so if we use it from
-      // here then this is undefined behaviour.
-      // So we're permitted to do anything, e.g. assume it is the same as
-      // the left branch.
-      //
-      // Moreover, when the values are the same, we know nothing happened.
-      if (it == right.end() || it->second == v) {
+      // When the values are the same, we know nothing happened.
+      if (it != right.end() && it->second == v) {
         valmap[k] = v;
         continue;
       }
 
       // The values might be different on the two sides.
       // In that case, we add them to the final yield operation.
+      auto w = it == right.end() ? (builder.setBefore(yr), builder.create<UndefOp>(v->type)->ret()) : it->second;
       yl->pushOperand(v);
-      yr->pushOperand(it->second);
-      auto newv = op->pushResult(v->type);
-      valmap[k] = newv;
+      yr->pushOperand(w);
+      valmap[k] = op->pushResult(v->type);
     }
-    // Add things defined in `r` but not defined in `l`. From a similar reasoning
-    // we can do this.
+    // Add things defined in `r` but not defined in `l`.
     for (auto [k, v] : right) {
-      if (!left.count(k))
-        valmap[k] = v;
+      if (!left.count(k)) {
+        builder.setBefore(yl);
+        auto w = builder.create<UndefOp>(v->type)->ret();
+        yl->pushOperand(w);
+        yr->pushOperand(v);
+        valmap[k] = op->pushResult(v->type);
+      }
     }
     return;
   }

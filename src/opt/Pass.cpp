@@ -78,6 +78,15 @@ GlobalOp *Pass::findGlobal(std::string_view name) const {
   return nullptr;
 }
 
+FuncOp *Pass::findFunction(std::string_view name) const {
+  for_all(FuncOp) {
+    if (op->name == name)
+      return op;
+  }
+
+  return nullptr;
+}
+
 Op *Pass::directBaseOf(Op *op) const {
   if (isa<AllocaOp>(op))
     return op;

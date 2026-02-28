@@ -62,7 +62,7 @@ declare_pass(PropagateArray) {
 
           builder.setAfter(callee);
           fn = cast<FuncOp>(builder.clone(callee));
-          fn->name = "__p" + std::to_string(index++) + "_" + callee->name;
+          fn->name = "_" + std::to_string(index++) + callee->name;
 
           // After cloning, replace the i'th argument to `val`.
           builder.setToStart(fn->getRegion());
@@ -85,11 +85,29 @@ declare_pass(PropagateArray) {
     }
   })
 
-  fixed(for (auto fn : collectFunctions()) {
-    if (!fn->ret()->used() && fn->name != "main") {
-      fn->erase();
-      mark_changed;
-    }
+  fixed(
+  auto cg = callGraph();
+  std::vector<FuncOp*> queue { findMain() };
+  auto funcs = collectFunctions();
+  std::set<FuncOp*> visited;
+  while (!queue.empty()) {
+    auto fn = queue.back();
+    queue.pop_back();
+    if (visited.count(fn))
+      continue;
+    visited.insert(fn);
+
+    for (auto x : cg[fn])
+      queue.push_back(x);
+  }
+
+  for (auto w : funcs) {
+    if (!visited.count(w))
+      w->getRegion()->prepareErase();
+  }
+  for (auto w : funcs) {
+    if (!visited.count(w))
+      w->erase(), mark_changed;
   })
 }
 

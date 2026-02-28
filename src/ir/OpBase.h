@@ -163,6 +163,7 @@ public:
   void setAttribute(const std::string &name, Attr *attr);
 
   void erase();
+  void dump() const;
 
   auto &getRegions() { return regions; }
   auto &getAttrs() { return attrs; }
@@ -401,6 +402,7 @@ public:
   Block *getFirstBlock() const { return bbs.front(); }
   Block *getLastBlock() const { return bbs.back(); }
 
+  Op *getFirstOp() const { return getFirstBlock()->getFirstOp(); }
   Op *getLastOp() const { return getLastBlock()->getLastOp(); }
 
   struct MoveResult {

@@ -35,14 +35,13 @@ declare_local_pass(DestroyPhi,
 void DestroyPhi::spill(Value *v) {
   Builder builder;
   auto alloca = (AllocaOp *) (unsigned long) assignment[v];
-  for (auto it = v->getUses().begin(); it != v->getUses().end();) {
-    auto next = it; next++;
+  while (!v->getUses().empty()) {
+    auto it = v->getUses().begin();
     Op *use = *it;
     builder.setBefore(use);
     auto ld = builder.create<LdrOp>(v->type)->with(alloca->ret());
     assignment[ld->ret()] = scratch[use->getOperandIndex(v)];
     use->replaceOperand(v, ld->ret());
-    it = next;
   }
 
   builder.setAfter(v->def);
