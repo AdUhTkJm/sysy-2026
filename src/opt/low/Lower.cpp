@@ -34,10 +34,20 @@ void Lower::runImpl(FuncOp *func) {
   rename(SubIOp, SubWOp);
   rename(MulIOp, MulWOp);
   rename(DivIOp, DivWOp);
+  rename(AddFOp, FaddOp);
+  rename(SubFOp, FsubOp);
+  rename(MulFOp, FmulOp);
+  rename(DivFOp, FdivOp);
   rename(EqOp, CmpEqOp);
   rename(NeOp, CmpNeOp);
   rename(LtOp, CmpLtOp);
   rename(LeOp, CmpLeOp);
+  rename(EqFOp, FcmpEqOp);
+  rename(NeFOp, FcmpNeOp);
+  rename(LtFOp, FcmpLtOp);
+  rename(LeFOp, FcmpLeOp);
+  rename(F2IOp, FcvtzsOp);
+  rename(I2FOp, ScvtfOp);
   rename(AndIOp, AndWOp);
   
   for_all(NotOp, func) {
@@ -47,6 +57,14 @@ void Lower::runImpl(FuncOp *func) {
 
     auto val = op->val();
     builder.replace<CmpEqOp>(op, i32)->with(val, movi->ret());
+  }
+  for_all(NotFOp, func) {
+    builder.setBefore(op);
+    // This will be translated later in the function.
+    auto zero = builder.createFloat(0);
+
+    auto val = op->val();
+    builder.replace<FcmpEqOp>(op, i32)->with(val, zero->ret());
   }
   for_all(ModIOp, func) {
     // a % b => a - (a / b) * b
@@ -143,6 +161,13 @@ void Lower::runImpl(FuncOp *func) {
       op->ret()->replaceAllUsesWith(dest);
       op->erase();
     }
+  }
+  for_all(FloatOp, func) {
+    int v = *(int *) &op->value;
+    builder.setBefore(op);
+    auto li = builder.create<MovIOp>(i32);
+    li->value = v;
+    builder.replace<FmovOp>(op, f32)->with(li->ret());
   }
 
   // Lower GetGlobals after we finished accessing arrays.

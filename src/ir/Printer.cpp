@@ -173,7 +173,12 @@ format(EqOp, "$r0 = $x0 == $x1");
 format(NeOp, "$r0 = $x0 != $x1");
 format(LtOp, "$r0 = $x0 < $x1");
 format(LeOp, "$r0 = $x0 <= $x1");
+format(EqFOp, "$r0 = $x0 == $x1");
+format(NeFOp, "$r0 = $x0 != $x1");
+format(LtFOp, "$r0 = $x0 < $x1");
+format(LeFOp, "$r0 = $x0 <= $x1");
 format(NotOp, "$r0 = ! $x0");
+format(NotFOp, "$r0 = ! $x0");
 format(ReturnOp, "return $x0?");
 format(ModuleOp, "module");
 format(IfOp, "$r>0 = if $x0");
@@ -195,22 +200,33 @@ format(CondMarkerOp, "<condition begin>")
 /* ARM operations */
 format(AddWOp, "add $r0, $x0, $x1");
 format(AddXOp, "add $R0, $X0, $X1");
+format(FaddOp, "fadd $r0, $x0, $x1");
 format(AndWOp, "and $r0, $x0, $x1");
 format(AndXOp, "and $R0, $X0, $X1");
 format(MaddWOp, "madd $r0, $x0, $x1, $x2");
 format(MsubWOp, "msub $r0, $x0, $x1, $x2");
 format(SubWOp, "sub $r0, $x0, $x1");
 format(SubXOp, "sub $R0, $X0, $X1");
+format(FsubOp, "fsub $r0, $x0, $x1");
 format(MulWOp, "mul $r0, $x0, $x1");
-format(MulXOp, "mul $R0, $X0, $X1");
+format(MulXOp, "mul $r0, $x0, $x1");
+format(FmulOp, "fmul $R0, $X0, $X1");
 format(DivWOp, "sdiv $r0, $x0, $x1");
 format(DivXOp, "sdiv $R0, $X0, $X1");
+format(FdivOp, "fdiv $r0, $x0, $x1");
 format(EorWOp, "eor $r0, $x0, $x1");
 format(LslWOp, "lsl $r0, $x0, $x1");
 format(CmpEqOp, "cmp $x0, $x1\ncset $r0, eq");
 format(CmpNeOp, "cmp $x0, $x1\ncset $r0, ne");
 format(CmpLtOp, "cmp $x0, $x1\ncset $r0, lt");
 format(CmpLeOp, "cmp $x0, $x1\ncset $r0, le");
+format(FcmpEqOp, "fcmp $x0, $x1\ncset $r0, eq");
+format(FcmpNeOp, "fcmp $x0, $x1\ncset $r0, ne");
+format(FcmpLtOp, "fcmp $x0, $x1\ncset $r0, lt");
+format(FcmpLeOp, "fcmp $x0, $x1\ncset $r0, le");
+format(FmovOp, "fmov $r0, $x0");
+format(FcvtzsOp, "fcvtzs $r0, $x0");
+format(ScvtfOp, "scvtf $r0, $x0");
 format(RetOp, "ret");
 
 #define iprinter(Ty, name) \
@@ -437,26 +453,36 @@ printer(WriteRegOp) {
   auto wr = cast<WriteRegOp>(op);
   auto val = wr->val();
   std::string name = regname(wr->reg);
+  std::string opname = "mov ";
   if (val->type == i32)
     name[0] = 'w';
+  if (val->type == f32) {
+    name[0] = 's';
+    opname = "fmov ";
+  }
 
   auto valreg = printer->str(val);
   if (valreg == name && !printer->showHidden)
     return;
-  os << "mov " << name << ", " << valreg;
+  os << opname << name << ", " << valreg;
 }
 
 printer(ReadRegOp) {
   auto wr = cast<ReadRegOp>(op);
   auto ret = wr->ret();
   std::string name = regname(wr->reg);
+  std::string opname = "mov ";
   if (ret->type == i32)
     name[0] = 'w';
+  if (ret->type == f32) {
+    name[0] = 's';
+    opname = "fmov ";
+  }
 
   auto retreg = printer->str(ret);
   if (retreg == name && !printer->showHidden)
     return;
-  os << "mov " << retreg << ", " << name;
+  os << opname << retreg << ", " << name;
 }
 
 attr_printer(IntAttr) {

@@ -9,6 +9,8 @@ declare_pass(Print) {
     std::string name = regname(r);
     if (v->type == i32)
       name[0] = 'w';
+    if (v->type == f32)
+      name[0] = 's';
 
     printer.addIdent(v, name);
   }

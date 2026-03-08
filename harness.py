@@ -7,7 +7,7 @@ from pathlib import Path
 
 TEST_ROOT = Path("test")
 TEMP_DIR = Path("temp")
-COMPILER = "build/hcc"   # your compiler
+COMPILER = "build/hcc" 
 QEMU = "qemu-aarch64-static"
 RESULT_FILE = Path("results.json")
 GCC = "aarch64-linux-gnu-gcc"
@@ -99,7 +99,7 @@ for file in TEST_ROOT.rglob("*.sy"):
   name = str(file)
   if "performance" in name or "h_functional" in name or "custom" in name:
     continue
-  print(f"running: {file}", file=sys.stderr, file=sys.stderr)
+  print(f"running: {file}", file=sys.stderr)
 
   passed, elapsed = run_test(file)
   if not passed:

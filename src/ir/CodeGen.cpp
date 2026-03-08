@@ -141,7 +141,32 @@ Value *CodeGen::emitExpr(ASTNode *node) {
     }
 
     Value *l = emitExpr(bin->l), *r = emitExpr(bin->r);
-    // TODO: what about floating point?
+    if (l->type == f32) {
+      // Sema should have inserted conversion nodes.
+      assert(r->type == f32);
+      switch (bin->kind) {
+      case BinaryNode::Add:
+        return builder.create<AddFOp>(f32)->with(l, r)->ret();
+      case BinaryNode::Sub:
+        return builder.create<SubFOp>(f32)->with(l, r)->ret();
+      case BinaryNode::Mul:
+        return builder.create<MulFOp>(f32)->with(l, r)->ret();
+      case BinaryNode::Div:
+        return builder.create<DivFOp>(f32)->with(l, r)->ret();
+      case BinaryNode::Eq:
+        return builder.create<EqFOp>(i32)->with(l, r)->ret();
+      case BinaryNode::Ne:
+        return builder.create<NeFOp>(i32)->with(l, r)->ret();
+      case BinaryNode::Lt:
+        return builder.create<LtFOp>(i32)->with(l, r)->ret();
+      case BinaryNode::Le:
+        return builder.create<LeFOp>(i32)->with(l, r)->ret();
+      default:
+        std::cout << "unknown binary type: " << bin->kind << "\n";
+        assert(false);
+      }
+    }
+
     switch (bin->kind) {
     case BinaryNode::Add:
       return builder.create<AddIOp>(i32)->with(l, r)->ret();
@@ -169,6 +194,21 @@ Value *CodeGen::emitExpr(ASTNode *node) {
 
   if (auto un = dyn_cast<UnaryNode>(node)) {
     Value *v = emitExpr(un->node);
+    if (v->type == f32) {
+      switch (un->kind) {
+      case UnaryNode::Minus: {
+        auto zero = builder.createFloat(0);
+        return builder.create<SubFOp>(f32)->with(zero->ret(), v)->ret();
+      }
+      case UnaryNode::Not:
+        return builder.create<NotFOp>(i32)->with(v)->ret();
+      case UnaryNode::Float2Int:
+        return builder.create<F2IOp>(i32)->with(v)->ret();
+      default:
+        std::cout << "unknown unary type: " << un->kind << "\n";
+        assert(false);
+      }
+    }
     switch (un->kind) {
     case UnaryNode::Minus: {
       auto zero = builder.createInt(0);
@@ -176,8 +216,6 @@ Value *CodeGen::emitExpr(ASTNode *node) {
     }
     case UnaryNode::Not:
       return builder.create<NotOp>(i32)->with(v)->ret();
-    case UnaryNode::Float2Int:
-      return builder.create<F2IOp>(f32)->with(v)->ret();
     case UnaryNode::Int2Float:
       return builder.create<I2FOp>(f32)->with(v)->ret();
     default:
@@ -195,7 +233,10 @@ Value *CodeGen::emitExpr(ASTNode *node) {
     Values vals { array };
     for (auto x : access->indices)
       vals.push_back(emitExpr(x));
-    return builder.create<ArrayLoadOp>(array->type->pointee())->with(vals)->ret();
+    auto base = array->type;
+    while (base->kind == Type::ptr)
+      base = base->pointee();
+    return builder.create<ArrayLoadOp>(base)->with(vals)->ret();
   }
 
   if (auto call = dyn_cast<CallNode>(node)) {

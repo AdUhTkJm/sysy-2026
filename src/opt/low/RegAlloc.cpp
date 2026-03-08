@@ -95,9 +95,9 @@ void RegAlloc::markBlockConflict(Block *bb) {
   }
 
   // For all liveOuts, they are last-used at place size().
-  // If they aren't defined in this block, then `defined[op]` will be zero, which is intended.
-  for (auto op : bb->liveOut)
-    lastUsed[op] = ops.size();
+  // If they aren't defined in this block, then `defined[v]` will be zero, which is intended.
+  for (auto v : bb->liveOut)
+    lastUsed[v] = ops.size();
 
   // We use event-driven approach to optimize it into O(n log n + E).
   std::vector<Event> events;
@@ -175,7 +175,7 @@ void RegAlloc::allocate(Block *bb, bool isLeaf) {
         }
       }
 
-      // See if there's any preferred registers.
+      // See if there's any preferred register.
       int preferred = -1;
       for (auto use : v->getUses()) {
         if (auto wr = dyn_cast<WriteRegOp>(use)) {

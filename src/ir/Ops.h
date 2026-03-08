@@ -16,13 +16,16 @@ public: \
   X(IfOp) X(AllocaOp) X(LoadOp) X(StoreOp) X(ConditionOp) \
   X(ArrayStoreOp) X(ArrayLoadOp) X(CallOp) X(CondMarkerOp) \
   X(GetGlobalOp) X(EqOp) X(NeOp) X(LtOp) X(LeOp) X(NotOp) \
+  X(EqFOp) X(NeFOp) X(LtFOp) X(LeFOp) X(NotFOp) \
   X(YieldOp) X(I2FOp) X(F2IOp) X(UndefOp) X(ContinueOp) X(BreakOp) \
   X(DoWhileOp) X(AddLOp) X(AddFOp) X(SubFOp) X(MulFOp) X(DivFOp) \
   /* ARM operations */ \
   X(AddWOp) X(AddXOp) X(MaddWOp) X(MsubWOp) \
   X(SubWOp) X(SubXOp) X(MulWOp) X(MulXOp) \
   X(DivWOp) X(DivXOp) X(CmpEqOp) X(CmpNeOp) X(CmpLtOp) X(CmpLeOp) \
-  X(RetOp) X(EorWOp) X(LslWOp) X(AndWOp) X(AndXOp) \
+  X(FaddOp) X(FsubOp) X(FmulOp) X(FdivOp) \
+  X(RetOp) X(EorWOp) X(LslWOp) X(AndWOp) X(AndXOp) X(FmovOp) \
+  X(FcmpEqOp) X(FcmpNeOp) X(FcmpLtOp) X(FcmpLeOp) X(FcvtzsOp) X(ScvtfOp) \
 
 #define terminator_list(X) \
   X(ReturnOp) X(BreakOp) X(ContinueOp) X(YieldOp)

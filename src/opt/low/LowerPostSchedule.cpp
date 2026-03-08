@@ -30,7 +30,7 @@ declare_local_pass(LowerPostSchedule) {
       auto ret = op->ret();
       if (ret->type != unit) {
         auto rd = builder.create<ReadRegOp>(ret->type);
-        rd->reg = x0;
+        rd->reg = regbank(ret->type) == INT ? x0 : v0;
         ret->replaceAllUsesWith(rd->ret());
       }
       op->clearResults();
@@ -38,7 +38,7 @@ declare_local_pass(LowerPostSchedule) {
 
     // Give functions more results, to mark conflicts.
     for (auto reg : callerSaved) {
-      auto value = op->pushResult(i64);
+      auto value = op->pushResult(regbank(reg) == INT ? i32 : f32);
       assignment[value] = reg;
     }
   }
