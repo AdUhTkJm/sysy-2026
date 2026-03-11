@@ -199,14 +199,13 @@ void DestroyPhi::lowerPhi(Block *bb) {
       v->replaceAllUsesWith(rd->ret());
     } else {
       auto alloca = (AllocaOp *) (unsigned long) reg;
-      for (auto it = v->getUses().begin(); it != v->getUses().end();) {
-        auto next = it; next++;
+      for (auto it = v->getUses().begin(); !v->getUses().empty();) {
         Op *use = *it;
         builder.setBefore(use);
         auto ld = builder.create<LdrOp>(v->type)->with(alloca->ret());
         assignment[ld->ret()] = scratch[use->getOperandIndex(v)];
         use->replaceOperand(v, ld->ret());
-        it = next;
+        it = v->getUses().begin();
       }
     }
     phi->erase();

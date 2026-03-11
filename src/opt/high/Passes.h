@@ -6,7 +6,7 @@ namespace opt {
 #define high_pass_list(X) \
   X(Mem2Reg) X(EnsureTerminator) X(HighDCE) X(Pure) X(PropagateArray) \
   X(RaiseArray) X(Recursive) X(TidyCodeGen) X(Fold) X(HighGVN) \
-  X(InlineGlobalStore)
+  X(InlineGlobalStore) X(LICM)
 
 high_pass_list(make_pass_decl);
 #undef make_pass_decl

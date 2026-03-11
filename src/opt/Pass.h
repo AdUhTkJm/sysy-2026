@@ -186,13 +186,10 @@ public:
 #define for_all(Ty, ...) \
   for (auto op : collectOps<Ty>(__VA_ARGS__))
 
-#define for_ops_in(parent, body) \
-  for (auto r : parent->getRegions()) { \
-    for (auto bb : *r) { \
+#define for_ops_in(parent) \
+  for (auto r : parent->getRegions()) \
+    for (auto bb : *r) \
       for (auto op : *bb) \
-        body \
-    } \
-  }
 
 }
 

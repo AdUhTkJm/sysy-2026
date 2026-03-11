@@ -7,7 +7,7 @@ namespace opt {
 // This might involve specializing the function.
 declare_pass(PropagateArray,
   unsigned index = 0;
-  std::map<std::pair<FuncOp*, Value*>, FuncOp*> specs;
+  std::map<std::tuple<FuncOp*, unsigned, Value*>, FuncOp*> specs;
 
   bool specialize(FuncOp *func, unsigned i, Value *v);
 ) {
@@ -87,7 +87,7 @@ bool PropagateArray::specialize(FuncOp *func, unsigned i, Value *v) {
   // Create (or retrieve) the specialized version of this function.
   FuncOp *spec;
   bool changed = false;
-  auto key = std::make_pair(func, v);
+  auto key = std::make_tuple(func, i, v);
   if (auto it = specs.find(key); it != specs.end())
     spec = it->second;
   else {

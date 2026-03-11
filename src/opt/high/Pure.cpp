@@ -4,9 +4,9 @@ namespace opt {
 
 static bool walk(Op *parent) {
   bool impure = false;
-  for_ops_in(parent, {
+  for_ops_in(parent) {
     impure |= walk(op);
-  });
+  }
   if (hasSideEffect(parent))
     impure = true;
 

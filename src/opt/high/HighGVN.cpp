@@ -7,7 +7,7 @@ namespace opt {
 #define allowed_list(X) \
   X(IntOp) X(FloatOp) X(GetGlobalOp) \
   X(AddIOp) X(SubIOp) X(MulIOp) X(DivIOp) X(ModIOp) \
-  X(AddLOp) \
+  X(AddLOp) X(LtOp) X(LeOp) X(EqOp) X(NeOp) \
 
 #define allow(Ty) \
   isa<Ty>(op) ||
@@ -15,6 +15,8 @@ namespace opt {
 static bool allowed(Op *op) {
   return allowed_list(allow) false;
 }
+
+Pass *makeHighDCE(ModuleOp *module);
 
 struct Key {
   int id;
@@ -100,6 +102,8 @@ declare_pass(HighGVN,
     }
     walk(func);
   }
+
+  makeHighDCE(module)->run();
 };
 
 Key HighGVN::hash(Value *v) const {

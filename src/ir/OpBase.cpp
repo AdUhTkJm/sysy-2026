@@ -176,7 +176,7 @@ void Op::removeRegion(Region *region) {
 void Op::setOperand(int i, Value *v) {
   auto value = operands[i];
   operands[i] = v;
-  value->uses.erase(this);
+  value->uses.erase(value->uses.find(this));
   v->uses.insert(this);
 }
 
