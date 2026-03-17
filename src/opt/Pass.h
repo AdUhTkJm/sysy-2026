@@ -16,7 +16,7 @@ concept walk_order = std::same_as<T, Preorder> || std::same_as<T, Postorder>;
 class Pass {
 private:
   template<class F>
-  void walkImpl(ir::Op *parent, const F &f, Preorder) const {
+  static void walkImpl(ir::Op *parent, const F &f, Preorder) {
     f(parent);
     for (auto r : parent->getRegions()) {
       for (auto bb : *r) {
@@ -30,7 +30,7 @@ private:
   }
 
   template<class F>
-  void walkImpl(ir::Op *parent, const F &f, Postorder) const {
+  static void walkImpl(ir::Op *parent, const F &f, Postorder) {
     for (auto r : parent->getRegions()) {
       for (auto bb : *r) {
         for (auto it = bb->begin(); it != bb->end();) {
@@ -44,7 +44,7 @@ private:
   }
 
   template<class T, class F> __requires(walk_order<T>)
-  void walkImpl(ir::Op *parent, const F &f) const {
+  static void walkImpl(ir::Op *parent, const F &f) {
     walkImpl(parent, f, T{});
   }
 public:
@@ -86,11 +86,6 @@ protected:
   template<class T>
   std::vector<T*> collectOps() const { return collectOps<T>(module); }
 
-  template<class T = Preorder, class F> __requires((std::invocable<F, ir::Op*>) && walk_order<T>)
-  void walk(ir::Op *parent, const F &f) const {
-    walkImpl<T>(parent, f);
-  }
-
   template<class T> __requires((std::derived_from<T, ir::Op>))
   bool contains(ir::Op *op) {
     if (isa<T>(op))
@@ -128,6 +123,11 @@ public:
   virtual void run() = 0;
   virtual const char *name() = 0;
   Pass(ir::ModuleOp *module): module(module) {}
+
+  template<class T = Preorder, class F> __requires((std::invocable<F, ir::Op*>) && walk_order<T>)
+  static void walk(ir::Op *parent, const F &f) {
+    walkImpl<T>(parent, f);
+  }
 };
 
 class PassManager {

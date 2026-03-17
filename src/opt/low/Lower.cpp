@@ -1,4 +1,4 @@
-#include "Common.h"
+#include "Common.h" // IWYU pragma: keep
 
 namespace opt {
 
@@ -8,21 +8,10 @@ namespace opt {
 
 declare_pass(Lower,
   void runImpl(FuncOp *func);
-  std::vector<int> getDim(Value *addr) const;
 ) {
   printer.setBlockPrefix(".L");
   for (auto x : collectFunctions())
     runImpl(x);
-}
-
-std::vector<int> Lower::getDim(Value *addr) const {
-  auto base = baseOf(addr);
-  if (auto dim = base->get<DimAttr>())
-    return dim->dims;
-
-  // This has to be a function argument.
-  assert(isa<FuncOp>(base));
-  return base->get<ArgDimAttr>()->dims.at(addr);
 }
 
 void Lower::runImpl(FuncOp *func) {
@@ -49,6 +38,7 @@ void Lower::runImpl(FuncOp *func) {
   rename(F2IOp, FcvtzsOp);
   rename(I2FOp, ScvtfOp);
   rename(AndIOp, AndWOp);
+  rename(SextOp, SxtwOp);
   
   for_all(NotOp, func) {
     builder.setBefore(op);
@@ -111,56 +101,6 @@ void Lower::runImpl(FuncOp *func) {
   for_all(StoreOp, func) {
     auto ld = builder.rename<StrOp>(op);
     ld->value = 0;
-  }
-  for_all(ArrayStoreOp, func) {
-    builder.setBefore(op);
-
-    Value *dest = op->val(0), *val = op->val(op->getNumOperands() - 1);
-    auto dims = getDim(dest);
-    
-    int stride = asmSize(val->type);
-    for (int i = (int) dims.size() - 1; i >= 0; i--) {
-      auto movi = builder.create<MovIOp>(i32);
-      movi->value = stride;
-
-      auto mul = builder.create<MulWOp>(i32)->with(op->val(i + 1), movi->ret());
-      // TODO: This is a type mismatch. Maybe add zext here?
-      dest = builder.create<AddXOp>(i64)->with(dest, mul->ret())->ret();
-      stride *= dims[i];
-    }
-
-    builder.replace<StrOp>(op)->with(dest, val);
-  }
-  for_all(ArrayLoadOp, func) {
-    builder.setBefore(op);
-
-    Value *dest = op->val(0);
-    auto dims = getDim(dest);
-    
-    int stride = asmSize(op->ret()->type);
-    // It is possible that ArrayLoadOp only dereferences a certain amount of dimensions,
-    // but not all.
-    int i = dims.size() - 1;
-    while (i + 1 >= (int) op->getNumOperands())
-      stride *= dims[i--];
-
-    bool fulldim = i + 1 == (int) dims.size();
-    for (; i >= 0; i--) {
-      auto movi = builder.create<MovIOp>(i32);
-      movi->value = stride;
-
-      auto mul = builder.create<MulWOp>(i32)->with(op->val(i + 1), movi->ret());
-      dest = builder.create<AddXOp>(i64)->with(dest, mul->ret())->ret();
-      stride *= dims[i];
-    }
-
-    if (fulldim) {
-      auto ty = op->ret()->type;
-      builder.replace<LdrOp>(op, ty)->with(dest);
-    } else {
-      op->ret()->replaceAllUsesWith(dest);
-      op->erase();
-    }
   }
   for_all(FloatOp, func) {
     int v = *(int *) &op->value;

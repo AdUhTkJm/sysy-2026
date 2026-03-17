@@ -11,12 +11,13 @@ namespace ir {
 Printer printer;
 
 static std::string widen(const std::string &str) {
-  if (str[0] != 'w')
-    return str;
+  return str;
+  // if (str[0] != 'w')
+  //   return str;
 
-  std::string result = str;
-  result[0] = 'x';
-  return result;
+  // std::string result = str;
+  // result[0] = 'x';
+  // return result;
 }
 
 void printWithFormat(std::ostream &os, const Op *op, Printer *printer, const char *fmt) {
@@ -196,7 +197,8 @@ format(UndefOp, "\\$r0 = undef $tr0");
 format(DoWhileOp, "$r>0 = do-while $x>0");
 format(ContinueOp, "continue");
 format(BreakOp, "break");
-format(CondMarkerOp, "<condition begin>")
+format(SextOp, "$r0 = sext $x0");
+format(CondMarkerOp, "<condition begin>");
 /* ARM operations */
 format(AddWOp, "add $r0, $x0, $x1");
 format(AddXOp, "add $R0, $X0, $X1");
@@ -216,6 +218,7 @@ format(DivXOp, "sdiv $R0, $X0, $X1");
 format(FdivOp, "fdiv $r0, $x0, $x1");
 format(EorWOp, "eor $r0, $x0, $x1");
 format(LslWOp, "lsl $r0, $x0, $x1");
+format(SxtwOp, "sxtw $r0, $x0");
 format(CmpEqOp, "cmp $x0, $x1\ncset $r0, eq");
 format(CmpNeOp, "cmp $x0, $x1\ncset $r0, ne");
 format(CmpLtOp, "cmp $x0, $x1\ncset $r0, lt");
@@ -256,10 +259,17 @@ printer(AddWLslOp) {
   os << "add " << printer->str(op->ret()) << ", ";
   os << printer->str(op->val(0)) << ", " << printer->str(op->val(1)) << ", lsl #" << x->value;
 }
+
 printer(AddXLslOp) {
   auto x = cast<AddXLslOp>(op);
   os << "add " << printer->str(op->ret()) << ", ";
   os << widen(printer->str(op->val(0))) << ", " << widen(printer->str(op->val(1))) << ", lsl #" << x->value;
+}
+
+printer(AddSxtOp) {
+  auto x = cast<AddSxtOp>(op);
+  os << "add " << printer->str(op->ret()) << ", ";
+  os << widen(printer->str(op->val(0))) << ", " << widen(printer->str(op->val(1))) << ", sxtw #" << x->value;
 }
 
 printer(MovIOp) {
@@ -675,14 +685,7 @@ std::ostream &operator<<(std::ostream &os, const Op *op) {
 }
 
 std::ostream &operator<<(std::ostream &os, const Value *v) {
-  if (v->def) {
-    os << "result #" << v->def->getResultIndex(v) << " of ";
-    printer.print(v->def);
-    printer.dump(os);
-  } else {
-    os << "block operand #" << v->bb->getArgIndex(v) << " of " << v->bb;
-  }
-  return os;
+  return os << printer.str(v);
 }
 
 std::ostream &operator<<(std::ostream &os, const Block *bb) {

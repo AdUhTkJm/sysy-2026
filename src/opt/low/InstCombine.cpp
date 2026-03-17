@@ -12,11 +12,11 @@ Pass *makeHighDCE(ir::ModuleOp *module);
 
 static Rule rules[] = {
   Rule("(addw (movi 'a) (movi 'b))") >> "(movi:i32 (!add 'a 'b))",
-  Rule("(addw x (movi 'a))") >> "(addwi:i32 x 'a)",
-  Rule("(addx x (movi 'a))") >> "(addxi:i64 x 'a)",
+  Rule("(addw x (movi 'a))") >> "(addwi:i32 x 'a)" when { return imm("'a") < 4096 && imm("'a") >= 0; },
+  Rule("(addx x (movi 'a))") >> "(addxi:i64 x 'a)" when { return imm("'a") < 4096 && imm("'a") >= 0; },
   Rule("(subw (movi 'a) (movi 'b))") >> "(movi:i32 (!sub 'a 'b))",
-  Rule("(subw x (movi 'a))") >> "(subwi:i32 x 'a)",
-  Rule("(subx x (movi 'a))") >> "(subxi:i64 x 'a)",
+  Rule("(subw x (movi 'a))") >> "(subwi:i32 x 'a)" when { return imm("'a") < 4096 && imm("'a") >= 0; },
+  Rule("(subx x (movi 'a))") >> "(subxi:i64 x 'a)" when { return imm("'a") < 4096 && imm("'a") >= 0; },
   Rule("(mulw x (movi 'a))") >> "x" when { return imm("'a") == 1; },
   Rule("(mulw (movi 'a) (movi 'b))") >> "(movi:i32 (!mul 'a 'b))",
   Rule("(addwi x 'a)") >> "x" when { return imm("'a") == 0; },

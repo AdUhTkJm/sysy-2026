@@ -65,6 +65,8 @@ declare_pass(EnsureTerminator,
     loop_and_mark_changed(IfOp, canonicalizeReturn);
     loop_and_mark_changed(DoWhileOp, canonicalizeReturn);
   );
+  loop_with(IfOp, removeRedundant);
+  loop_with(DoWhileOp, removeRedundant);
 
   for_all(CondMarkerOp)
     op->erase();

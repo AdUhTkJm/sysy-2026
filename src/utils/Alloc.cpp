@@ -34,5 +34,8 @@ void Arena::reset() {
     delete[] p;
     p = q;
   }
-  used = 0;
+  buf = new char[chunk];
+  *(char **) buf = 0;
+  head = buf;
+  used = sizeof(char*);
 }

@@ -5,7 +5,7 @@
 namespace opt {
 
 #define allowed_list(X) \
-  X(IntOp) X(FloatOp) X(GetGlobalOp) \
+  X(IntOp) X(FloatOp) X(GetGlobalOp) X(SextOp) \
   X(AddIOp) X(SubIOp) X(MulIOp) X(DivIOp) X(ModIOp) \
   X(AddLOp) X(LtOp) X(LeOp) X(EqOp) X(NeOp) \
 
@@ -27,7 +27,7 @@ struct Key {
     float vf;
   };
 
-  bool operator<(Key other) const {
+  bool operator<(const Key &other) const {
     if (auto diff = id - other.id)
       return diff < 0;
     if (auto diff = loc - other.loc)
@@ -35,8 +35,8 @@ struct Key {
     if (auto diff = (int) operand.size() - (int) other.operand.size())
       return diff < 0;
     for (unsigned i = 0; i < operand.size(); i++) {
-      if (operand[i] < other.operand[i])
-        return true;
+      if (operand[i] != other.operand[i])
+        return operand[i] < other.operand[i];
     }
 
     if (id == IntOp::id)
@@ -113,11 +113,14 @@ Key HighGVN::hash(Value *v) const {
   k.loc = op->getOperandIndex(v);
 
   for (auto [i, x] : data::enumerate(op->getOperands())) {
-    if (!symbols.count(x))
-      std::cerr << "domination violated: " << v;
+    if (!symbols.count(x)) {
+      std::cerr << "domination violated: " << v << "\n";
+      assert(false && "bad symbol");
+    }
     k.operand.push_back(symbols.at(x));
   }
-  std::sort(k.operand.begin(), k.operand.end());
+  if (isa<AddIOp>(op) || isa<MulIOp>(op))
+    std::sort(k.operand.begin(), k.operand.end());
 
   if (auto i = dyn_cast<IntOp>(op))
     k.vi = i->value;

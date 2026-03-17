@@ -17,6 +17,31 @@ declare_local_pass(DestroyPhi,
   for (auto bb : *region)
     lowerPhi(bb);
 
+  // The phis are now destroyed. Rewrite them to reads.
+  Builder builder;
+  for_all(PhiOp, region->getParentOp()) {
+    builder.setBefore(op);
+
+    auto v = op->ret();
+    auto reg = assignment[v];
+
+    if (reg < reg_end) {
+      auto rd = createAssignedRd(builder, assignment[v], v->type);
+      v->replaceAllUsesWith(rd->ret());
+    } else {
+      auto alloca = (AllocaOp *) (unsigned long) reg;
+      for (auto it = v->getUses().begin(); !v->getUses().empty();) {
+        Op *use = *it;
+        builder.setBefore(use);
+        auto ld = builder.create<LdrOp>(v->type)->with(alloca->ret());
+        assignment[ld->ret()] = scratch[use->getOperandIndex(v)];
+        use->replaceOperand(v, ld->ret());
+        it = v->getUses().begin();
+      }
+    }
+    op->erase();
+  }
+
   for (auto bb : *region) {
     std::vector<Value*> toSpill;
     for (auto op : *bb) {
@@ -117,6 +142,8 @@ void DestroyPhi::lowerPhi(Block *bb) {
     for (auto phi : phis) {
       auto src = assignment.at(phi->incomingFrom(pred));
       auto dst = assignment.at(phi->ret());
+      // std::cerr << "src = " << phi->incomingFrom(pred) << ": " << src << "\n";
+      // std::cerr << "dst = " << phi->ret() << ": " << dst << "\n";
       if (src == dst)
         continue;
 
@@ -184,31 +211,6 @@ void DestroyPhi::lowerPhi(Block *bb) {
       for (auto r : cycle)
         copy.erase(r.first);
     }
-  }
-
-  // The phis are now destroyed. Rewrite them to reads.
-  Builder builder;
-  for (auto phi : phis) {
-    builder.setBefore(phi);
-
-    auto v = phi->ret();
-    auto reg = assignment[v];
-
-    if (reg < reg_end) {
-      auto rd = createAssignedRd(builder, assignment[v], v->type);
-      v->replaceAllUsesWith(rd->ret());
-    } else {
-      auto alloca = (AllocaOp *) (unsigned long) reg;
-      for (auto it = v->getUses().begin(); !v->getUses().empty();) {
-        Op *use = *it;
-        builder.setBefore(use);
-        auto ld = builder.create<LdrOp>(v->type)->with(alloca->ret());
-        assignment[ld->ret()] = scratch[use->getOperandIndex(v)];
-        use->replaceOperand(v, ld->ret());
-        it = v->getUses().begin();
-      }
-    }
-    phi->erase();
   }
 }
 

@@ -11,7 +11,7 @@ namespace opt {
 
 #define removable_decl(Ty) isa<Ty>(op) ||
 
-bool removable(Op *op) {
+static bool removable(Op *op) {
   return removable_op_list(removable_decl) false;
 }
 

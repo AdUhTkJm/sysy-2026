@@ -13,7 +13,7 @@ add_executable(hcc ${SRC_FILES})
 
 target_compile_options(hcc PRIVATE
   -Wall -Wextra -Wpedantic -Wno-gnu-anonymous-struct -Wno-nested-anon-types
-  -Wno-variadic-macro-arguments-omitted
+  -Wno-variadic-macro-arguments-omitted -Wno-zero-length-array
   -fno-exceptions -fno-rtti -fdiagnostics-color=always -fsanitize=undefined,address
   -g -std=c++17
 )

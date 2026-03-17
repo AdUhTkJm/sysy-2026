@@ -30,6 +30,16 @@ void populate(opt::PassManager &pm) {
   add_pass(Fold);
   add_pass(HighGVN);
   add_pass(LICM);
+  add_pass(Fold);
+  add_pass(LowerArray);
+  add_pass(LICM);
+  add_pass(HighGVN);
+  for (int i = 0; i < 3; i++) {
+    add_pass(SCEV);
+    add_pass(ADCE);
+    add_pass(HighGVN);
+    add_pass(Fold);
+  }
 
   // Mid-IR passes.
   add_pass(Flatten);

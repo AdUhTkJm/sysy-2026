@@ -5,7 +5,7 @@ namespace opt {
 
 declare_local_pass(AddressMode) {
   Builder builder;
-  std::vector<Op*> clean;
+  std::set<Op*> clean;
 
   for_all(LdrOp, func) {
     if (op->value != 0)
@@ -18,7 +18,7 @@ declare_local_pass(AddressMode) {
       auto l = builder.replace<LdrLslOp>(op, ty)->with(base->val(0), base->val(1));
       l->value = 0;
 
-      clean.push_back(base);
+      clean.insert(base);
       continue;
     }
 
@@ -26,7 +26,7 @@ declare_local_pass(AddressMode) {
       auto l = builder.replace<LdrLslOp>(op, ty)->with(base->val(0), base->val(1));
       l->value = lsl->value;
 
-      clean.push_back(base);
+      clean.insert(base);
       continue;
     }
   }
@@ -42,7 +42,7 @@ declare_local_pass(AddressMode) {
       auto l = builder.replace<StrLslOp>(op)->with(base->val(0), base->val(1), value);
       l->value = 0;
 
-      clean.push_back(base);
+      clean.insert(base);
       continue;
     }
 
@@ -50,7 +50,7 @@ declare_local_pass(AddressMode) {
       auto l = builder.replace<StrLslOp>(op)->with(base->val(0), base->val(1), value);
       l->value = lsl->value;
 
-      clean.push_back(base);
+      clean.insert(base);
       continue;
     }
   }

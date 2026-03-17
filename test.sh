@@ -55,6 +55,8 @@ while [[ $# -gt 0 ]] do
     shift 2;;
   -g|--gdb)
     gdb=1; shift;;
+  -clang)
+    clang=1; shift;;
   -p|--print-before)
     if [[ $# -lt 2 ]]; then
       die "expected test case name"
@@ -127,6 +129,28 @@ if [[ -n $testcase ]]; then
     die "ambiguous name: $testcase"
   fi
   echo "running: $name"
+  if [[ -n $clang ]]; then
+    cp test/lib.c temp/a.c
+    cat $name >> temp/a.c
+    aarch64-linux-gnu-g++ -x c++ temp/a.c -O3 -o temp/b.out \
+      -Wno-unused-result -static
+
+    aarch64-linux-gnu-g++ -x c++ -S temp/a.c -O3 -o temp/b.s \
+      -Wno-unused-result -fno-dwarf2-cfi-asm -fno-stack-protector
+    rm temp/a.c
+    echo clang compiled.
+
+    in=/dev/null
+    base=${name/.sy/.in}
+    if [[ -f $base ]]; then
+      in=$base
+    fi
+    qemu-aarch64-static temp/b.out < $in
+    ret=$?
+    echo; echo $ret
+    exit 0
+  fi
+
   cmd="build/hcc $name"
   if [[ -n $gdb ]]; then
     cmd="gdb --args $cmd"
@@ -156,7 +180,7 @@ if [[ -n $testcase ]]; then
   fi
 
   eval "ASAN_OPTIONS=detect_leaks=0 $cmd"
-  check $? "hcc"  
+  check $? "hcc"
   echo compiled.
   if [[ -n $exec ]]; then
     aarch64-linux-gnu-gcc -x c test/lib.c -x assembler $output -o temp/a.out -static
