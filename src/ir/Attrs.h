@@ -11,7 +11,8 @@ namespace ir {
 
 #define attr_list(X) \
   X(IntAttr) X(SizeAttr) X(DimAttr) X(ArgDimAttr) \
-  X(ConstIArrAttr) X(ConstFArrAttr) X(ImpureAttr) X(RecursiveAttr)
+  X(ConstIArrAttr) X(ConstFArrAttr) X(ImpureAttr) X(RecursiveAttr) \
+  X(IncomingStackArgAttr)
 
 class Block;
 class Value;
@@ -110,6 +111,8 @@ public:
 // Empty.
 class ImpureAttr : public AttrImpl<ImpureAttr> {};
 class RecursiveAttr : public AttrImpl<RecursiveAttr> {};
+// Marks `LdrOp` of a function parameter passed on the stack (offset patched in LateLegalize).
+class IncomingStackArgAttr : public AttrImpl<IncomingStackArgAttr> {};
 
 using Attributes = std::vector<const Attr*>;
 

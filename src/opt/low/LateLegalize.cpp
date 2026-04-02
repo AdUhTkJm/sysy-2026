@@ -226,6 +226,11 @@ void LateLegalize::relocateAlloca(FuncOp *func) {
     wr->reg = sp;
   }
 
+  for_all(LdrOp, func) {
+    if (op->has<IncomingStackArgAttr>())
+      op->value += total;
+  }
+
   // Fold the extra addition we've just introduced.
   // An alloca can only be used for loads, stores or passed as argument to some other function.
   // The final possibility is already lowered to `WriteRegOp`, so we must also check that.

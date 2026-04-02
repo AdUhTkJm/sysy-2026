@@ -10,16 +10,6 @@ namespace ir {
 
 Printer printer;
 
-static std::string widen(const std::string &str) {
-  return str;
-  // if (str[0] != 'w')
-  //   return str;
-
-  // std::string result = str;
-  // result[0] = 'x';
-  // return result;
-}
-
 void printWithFormat(std::ostream &os, const Op *op, Printer *printer, const char *fmt) {
   // The '\\' at front means this is a hidden operation.
   if (*fmt == '\\') {
@@ -161,6 +151,7 @@ format(AddIOp, "$r0 = $x0 + $x1");
 format(AddLOp, "$r0 = $x0 + $x1: i64");
 format(AddFOp, "$r0 = $x0 + $x1: f32");
 format(SubIOp, "$r0 = $x0 - $x1");
+format(SubLOp, "$r0 = $x0 - $x1: i64");
 format(SubFOp, "$r0 = $x0 - $x1: f32");
 format(MulIOp, "$r0 = $x0 * $x1");
 format(MulFOp, "$r0 = $x0 * $x1: f32");
@@ -263,18 +254,23 @@ printer(AddWLslOp) {
 printer(AddXLslOp) {
   auto x = cast<AddXLslOp>(op);
   os << "add " << printer->str(op->ret()) << ", ";
-  os << widen(printer->str(op->val(0))) << ", " << widen(printer->str(op->val(1))) << ", lsl #" << x->value;
+  os << printer->str(op->val(0)) << ", " << printer->str(op->val(1)) << ", lsl #" << x->value;
 }
 
 printer(AddSxtOp) {
   auto x = cast<AddSxtOp>(op);
   os << "add " << printer->str(op->ret()) << ", ";
-  os << widen(printer->str(op->val(0))) << ", " << widen(printer->str(op->val(1))) << ", sxtw #" << x->value;
+  os << printer->str(op->val(0)) << ", " << printer->str(op->val(1)) << ", sxtw #" << x->value;
 }
 
 printer(MovIOp) {
   auto movi = cast<MovIOp>(op);
   os << "mov " << printer->str(op->ret()) << ", #" << movi->value;
+}
+
+printer(MovLOp) {
+  auto movl = cast<MovLOp>(op);
+  os << "mov " << printer->str(op->ret()) << ", #" << movl->value;
 }
 
 printer(MovKOp) {
@@ -295,7 +291,7 @@ printer(StrOp) {
 printer(LdrLslOp) {
   auto ldr = cast<LdrLslOp>(op);
   os << "ldr " << printer->str(op->ret()) << ", ["
-     << printer->str(op->val()) << ", " << widen(printer->str(op->val(1)));
+     << printer->str(op->val()) << ", " << printer->str(op->val(1));
   
   if (ldr->value)
     os << ", lsl #" << ldr->value;
@@ -305,7 +301,7 @@ printer(LdrLslOp) {
 printer(StrLslOp) {
   auto str = cast<StrLslOp>(op);
   os << "str " << printer->str(op->val(2)) << ", ["
-     << printer->str(op->val()) << ", " << widen(printer->str(op->val(1)));
+     << printer->str(op->val()) << ", " << printer->str(op->val(1));
   if (str->value)
     os << ", lsl #" << str->value;
   os << "]";
@@ -429,6 +425,10 @@ printer(IntOp) {
   os << printer->str(op->ret(0)) << " = " << cast<IntOp>(op)->value;
 }
 
+printer(Int64Op) {
+  os << printer->str(op->ret(0)) << " = " << cast<Int64Op>(op)->value << "ll";
+}
+
 printer(FloatOp) {
   os << printer->str(op->ret(0)) << " = " << cast<FloatOp>(op)->value;
 }
@@ -550,6 +550,11 @@ attr_printer(RecursiveAttr) {
   os << "<rec>";
 }
 
+attr_printer(IncomingStackArgAttr) {
+  (void) attr;
+  os << "<stackarg>";
+}
+
 #define op_map_entry(Ty) { Ty::id, print##Ty },
 #define attr_map_entry(Ty) { Ty::identifier(), print##Ty },
 
@@ -660,6 +665,9 @@ void Printer::print(const Op *op) {
 }
 
 void Printer::print(const Attr *attr) {
+  if (!showAttr)
+    return;
+  
   os << ' ';
   auto printfn = attrDispatch()[attr->id];
   assert(printfn);

@@ -21,6 +21,7 @@ void Lower::runImpl(FuncOp *func) {
   rename(AddIOp, AddWOp);
   rename(AddLOp, AddXOp);
   rename(SubIOp, SubWOp);
+  rename(SubLOp, SubXOp);
   rename(MulIOp, MulWOp);
   rename(DivIOp, DivWOp);
   rename(AddFOp, FaddOp);
@@ -69,6 +70,15 @@ void Lower::runImpl(FuncOp *func) {
   for_all(IntOp, func) {
     auto i = op->value;
     auto li = builder.rename<MovIOp>(op);
+    li->value = i;
+  }
+  for_all(Int64Op, func) {
+    auto i = op->value;
+    auto li = builder.rename<MovLOp>(op);
+    // We don't want precision loss.
+    // In fact we should have this because `int64op` is only generated from sext + int;
+    // But assert here for safety.
+    assert(i < (1ll << 32) && i >= -(1ll << 32));
     li->value = i;
   }
   for_all(CallOp, func) {
@@ -122,15 +132,32 @@ void Lower::runImpl(FuncOp *func) {
     addx->name = std::move(name);
   }
 
-  // Lower function arguments as reads to physical registers.
+  // Lower function arguments: registers or incoming stack slots (see LateLegalize).
   builder.setToStart(func->getRegion());
+  std::vector<const Type*> ptypes;
   for (auto [i, arg] : data::enumerate(func->getResults())) {
     if (i == 0)
       continue;
-    // TODO: what happens when i >= 8?
-    auto rd = builder.create<ReadRegOp>(arg->type);
-    rd->reg = regbank(arg->type) == INT ? argRegs[i - 1] : fargRegs[i - 1];
-    arg->replaceAllUsesWith(rd->ret());
+    ptypes.push_back(arg->type);
+  }
+  std::vector<ArgLoc> locs;
+  argLayout(ptypes, locs);
+  auto spRd = createAssignedRd(builder, sp);
+  unsigned j = 0;
+  for (auto [i, arg] : data::enumerate(func->getResults())) {
+    if (i == 0)
+      continue;
+    const auto &loc = locs[j++];
+    if (loc.inReg) {
+      auto rd = builder.create<ReadRegOp>(arg->type);
+      rd->reg = loc.reg;
+      arg->replaceAllUsesWith(rd->ret());
+    } else {
+      auto ldr = builder.create<LdrOp>(arg->type)->with(spRd->ret());
+      ldr->value = loc.stackOffset;
+      ldr->set<IncomingStackArgAttr>();
+      arg->replaceAllUsesWith(ldr->ret());
+    }
   }
   for (unsigned i = func->getNumResults() - 1; i > 0; i--)
     func->removeResult(i);
