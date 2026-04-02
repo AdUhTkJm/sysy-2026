@@ -1,6 +1,7 @@
 #include "Common.h"
 #include "../../utils/presburger/Expr.h"
 #include <algorithm>
+#include <optional>
 
 using namespace pres;
 
@@ -17,6 +18,8 @@ declare_pass(SCEV,
   std::set<Value*> variants;
   std::unordered_map<Value *, Value *> starts;
   DoWhileOp *loop;
+
+  std::vector<Op*> generated;
 ) {
   for_all(DoWhileOp)
     evolve(op);
@@ -40,12 +43,23 @@ Value *SCEV::generate(Value *ind, const Expr &delta) {
   using Type = Expr::Type;
 
   std::unordered_map<const void *, Value *> sym;
+  bool failed = false;
+
   delta.walk([&](const Expr::ExprImpl *k) {
+    if (failed)
+      return;
+
     switch (k->type) {
     case Type::ConstInt:
       sym[k] = builder.createInt(k->vi)->ret();
+      generated.push_back(sym[k]->def);
       break;
     case Type::Parameter:
+      // We must make sure that the value is directly under the while,
+      // i.e. not nested in any if-statement.
+      if (k->v->def->getParentOp() != loop)
+        failed = true;
+      
       sym[k] = k->v;
       break;
     case Type::Indvar:
@@ -53,13 +67,27 @@ Value *SCEV::generate(Value *ind, const Expr &delta) {
       break;
     default:
       Value *v = creation_list(creation_impl_1) nullptr;
-      for (unsigned i = 2; i < k->nops; i++)
+      generated.push_back(v->def);
+      for (unsigned i = 2; i < k->nops; i++) {
         v = creation_list(creation_impl_2) nullptr;
+        generated.push_back(v->def);
+      }
       sym[k] = v;
       break;
     }
   });
 
+  if (failed) {
+    for (auto x : generated)
+      x->clearOperands();
+    for (auto x : generated)
+      x->erase();
+
+    generated.clear();
+    return nullptr;
+  }
+
+  generated.clear();
   return sym.at(delta.impl);
 }
 
@@ -198,35 +226,67 @@ void SCEV::evolve(DoWhileOp *loop) {
     starts[loop->ret(i)] = loop->val(i);
 
   std::unordered_map<Value*, Value*> deferred;
+  std::unordered_map<int, std::pair<Value*, Value*>> repr;
   for (const auto &[k, v] : pres) {
-    if (dont.count(k))
+    if (dont.count(k) || loop->getResultIndex(k) != loop->getNumResults())
       continue;
 
     auto delta = (v.step(inc) - v).simplify();
     // This value increments by zero. No need to do anything to it.
-    if (delta.impl->type == Expr::Type::ConstInt && delta.impl->vi == 0)
-      continue;
+    std::optional<int> recordVi;
+    if (delta.impl->type == Expr::Type::ConstInt) {
+      int vi = delta.impl->vi;
+      if (vi == 0)
+        continue;
+    
+      // The value `r` increases identically as `k`.
+      // This means we don't need to introduce another induction variable;
+      // we only need to compute their difference beforehand.
+      if (auto it = repr.find(vi); it != repr.end()) {
+        auto [r, rStart] = it->second;
+        if (k->type != r->type)
+          continue;
+
+        builder.setBefore(loop);
+        Value *start = generateStart(k, loop);
+        Op *diff = k->type == i32
+          ? (Op*) builder.create<SubIOp>(i32)->with(start, rStart)
+          : (Op*) builder.create<SubLOp>(i64)->with(start, rStart);
+
+        builder.setToStart(region);
+        Op *add = k->type == i32
+          ? (Op*) builder.create<AddIOp>(i32)->with(r, diff->ret())
+          : (Op*) builder.create<AddLOp>(i64)->with(r, diff->ret());
+
+        deferred[k] = add->ret();
+        continue;
+      }
+      recordVi = vi;
+    }
 
     builder.setBefore(k->def);
+    // The increment carries something in the if-statement.
     Value *increment = generate(ind, delta);
-    auto index = loop->getResultIndex(k);
+    if (!increment)
+      continue;
 
-    if (index == loop->getNumResults()) {
-      // The result is not loop-carried. Now we make it so.
-      // First generate a start value.
-      builder.setBefore(loop);
-      Value *start = generateStart(k, loop);
-      Value *ret = loop->pushResult(k->type);
-      loop->pushOperand(start);
-      deferred[k] = ret;
+    // The result is not loop-carried. Now we make it so.
+    // First generate a start value.
+    builder.setBefore(loop);
+    Value *start = generateStart(k, loop);
+    Value *ret = loop->pushResult(k->type);
+    loop->pushOperand(start);
+    deferred[k] = ret;
 
-      // Then update the condition's carried values.
-      builder.setBefore(cond);
-      Op *op = k->type == i32
-        ? (Op*) builder.create<AddIOp>(i32)->with(ret, increment)
-        : (Op*) builder.create<AddLOp>(i64)->with(ret, increment);
-      cond->pushOperand(op->ret());
-    }
+    // Then update the condition's carried values.
+    builder.setBefore(cond);
+    Op *op = k->type == i32
+      ? (Op*) builder.create<AddIOp>(i32)->with(ret, increment)
+      : (Op*) builder.create<AddLOp>(i64)->with(ret, increment);
+    cond->pushOperand(op->ret());
+
+    if (recordVi)
+      repr[*recordVi] = { ret, start };
   }
 
   for (auto [k, v] : deferred)

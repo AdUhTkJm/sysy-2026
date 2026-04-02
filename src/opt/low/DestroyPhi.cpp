@@ -188,6 +188,7 @@ void DestroyPhi::lowerPhi(Block *bb) {
     }
 
     // Now the ones in `copy` form cycles.
+    assert(copy.empty());
     while (!copy.empty()) {
       auto [start, result] = *copy.begin();
       std::vector<std::pair<Reg, const Type*>> cycle;

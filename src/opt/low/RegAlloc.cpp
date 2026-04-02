@@ -210,7 +210,7 @@ void RegAlloc::allocate(Block *bb, bool isLeaf) {
 
       // The value must be spilled.
       if (!assignment.count(v))
-        spill(v, bb->getParentRegion(), op->getOperandIndex(v));
+        spill(v, bb->getParentRegion(), op->getResultIndex(v));
     }
   }
 }

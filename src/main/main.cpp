@@ -29,6 +29,7 @@ void populate(opt::PassManager &pm) {
   add_pass(HighDCE);
   add_pass(Fold);
   add_pass(HighGVN);
+  // add_pass(Inline);
   add_pass(LICM);
   add_pass(Fold);
   add_pass(LowerArray);
@@ -40,6 +41,7 @@ void populate(opt::PassManager &pm) {
     add_pass(HighGVN);
     add_pass(Fold);
   }
+  add_pass(HighDCE);
 
   // Mid-IR passes.
   add_pass(Flatten);

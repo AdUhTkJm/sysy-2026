@@ -15,6 +15,7 @@ declare_pass(Print) {
     printer.addIdent(v, name);
   }
   printer.showHidden = false;
+  printer.showAttr = false;
 
   std::ofstream f;
   std::ostream &os = options.outputFile == "-" || options.outputFile == ""

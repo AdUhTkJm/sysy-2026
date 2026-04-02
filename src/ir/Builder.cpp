@@ -104,6 +104,12 @@ Op *Builder::cloneImpl(Op *op) {
   imm_op_list(clone_imm)
   regful_op_list(clone_regful)
   nameful_op_list(clone_nameful)
+  caseof(FloatOp) {
+    auto value = cast<FloatOp>(op)->value;
+    auto x = basecopy(FloatOp);
+    x->value = value;
+    return x;
+  }
   }
 
   std::cerr << "unknown op kind: " << kindname((OpKind) op->id) << "\n";

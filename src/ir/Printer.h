@@ -31,6 +31,7 @@ public:
   std::string str(const Value *value);
   std::string str(const Block *block);
   bool showHidden = true;
+  bool showAttr = true;
 
   void print(const Region *region);
   void print(const Block *block);

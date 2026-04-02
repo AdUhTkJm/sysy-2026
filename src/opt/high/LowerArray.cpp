@@ -59,6 +59,7 @@ declare_local_pass(LowerArray,
 
 std::vector<int> LowerArray::getDim(Value *addr) const {
   auto base = baseOf(addr);
+  std::cerr << addr->def << "\n";
   if (auto dim = base->get<DimAttr>())
     return dim->dims;
 

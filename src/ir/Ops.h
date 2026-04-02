@@ -18,7 +18,7 @@ public: \
   X(GetGlobalOp) X(EqOp) X(NeOp) X(LtOp) X(LeOp) X(NotOp) \
   X(EqFOp) X(NeFOp) X(LtFOp) X(LeFOp) X(NotFOp) X(SextOp) \
   X(YieldOp) X(I2FOp) X(F2IOp) X(UndefOp) X(ContinueOp) X(BreakOp) \
-  X(DoWhileOp) X(AddLOp) X(AddFOp) X(SubFOp) X(MulFOp) X(DivFOp) \
+  X(DoWhileOp) X(AddLOp) X(SubLOp) X(AddFOp) X(SubFOp) X(MulFOp) X(DivFOp) \
   /* ARM operations */ \
   X(AddWOp) X(AddXOp) X(MaddWOp) X(MsubWOp) \
   X(SubWOp) X(SubXOp) X(MulWOp) X(MulXOp) \
@@ -47,7 +47,7 @@ public: \
 
 #define arm_imm_op_list(X) \
   X(AddWIOp) X(AddXIOp) X(AddWLslOp) X(AddXLslOp) X(AddSxtOp) \
-  X(MovIOp) X(MovKOp) X(LdrOp) X(StrOp) X(LdpOp) X(StpOp) \
+  X(MovIOp) X(MovLOp) X(MovKOp) X(LdrOp) X(StrOp) X(LdpOp) X(StpOp) \
   X(EorWIOp) X(LdrLslOp) X(StrLslOp) X(LslWIOp) \
   X(SubWIOp) X(SubXIOp) X(AndWIOp) X(AndXIOp) 
 
@@ -63,7 +63,7 @@ public: \
 
 #define complete_op_list(X) \
   empty_op_list(X) \
-  X(BranchOp) X(JumpOp) X(PhiOp) X(IntOp) \
+  X(BranchOp) X(JumpOp) X(PhiOp) X(IntOp) X(Int64Op) \
   X(FuncOp) X(FloatOp) X(GlobalOp) X(ExternCallOp) \
   /* ARM operations */ \
   arm_branch_op_list(X) \
@@ -113,6 +113,9 @@ imm_op_list(imm_op)
 
 op(FloatOp,
   float value = 0;
+);
+op(Int64Op,
+  long value = 0;
 );
 op(ExternCallOp,
   std::string name;

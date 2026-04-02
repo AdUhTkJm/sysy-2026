@@ -85,7 +85,6 @@ const Pattern *Parser::parse() {
       for (int i = name.size() - 1; i >= 0; i--)
         value = value * 10 + name[i] - '0';
       pat->children[0] = (Pattern*) (unsigned long) value;
-      std::cout << "found literal";
       return pat;
     } 
 
@@ -149,6 +148,9 @@ void Env::clear() {
 }
 
 int Pattern::size() const {
+  if (kind == Var || kind == Imm)
+    return 0;
+
   int size;
   for (size = 0; size < 3; size++) {
     if (!children[size])
@@ -277,6 +279,9 @@ bool matchImmImpl(Op *op, const Pattern *pattern, Env &env) {
   Pattern pat(*pattern);
 
   auto size = pat.size();
+  if (size < 1)
+    return false;
+
   auto &last = pat.children[size - 1];
   if (last->kind != Pattern::Imm)
     return false;
@@ -328,6 +333,7 @@ Op *buildImmImpl(Builder &builder, const Pattern *pattern, const Env &env) {
 Adaptors adaptors {
   empty_op_list(empty_adaptor_decl)
   imm_op_list(imm_adaptor_decl)
+  adaptor_decl(Int64Op, Imm)
 };
 
 Op *Rule::build(Builder &builder) {

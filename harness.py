@@ -109,5 +109,3 @@ for file in TEST_ROOT.rglob("*.sy"):
 
 if len(timemap):
   print(timemap, file=sys.stderr)
-
-run_test(Path("test/functional/16_mulc.sy"))

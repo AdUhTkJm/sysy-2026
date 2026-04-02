@@ -109,7 +109,7 @@ Op *Pass::baseOf(Value *v) const {
   if (isa<GetGlobalOp>(op))
     return op->val()->def;
 
-  if (isa<AddXOp>(op)) {
+  if (isa<AddXOp>(op) || isa<AddLOp>(op)) {
     if (auto k = baseOf(op->val(0)))
       return k;
     

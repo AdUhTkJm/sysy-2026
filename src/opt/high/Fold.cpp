@@ -6,20 +6,36 @@ using namespace match;
 namespace opt {
 
 #define when & [](const Env &env) -> bool
+#define zero { return imm("'a") == 0; }
 #define imm(x) env.imms.at(x)
 
 static Rule rules[] = {
-  Rule("(addi x (int 'a))") >> "x" when { return imm("'a") == 0; },
+  Rule("(addi x (int 'a))") >> "x" when zero,
   Rule("(addi (int 'a) (int 'b))") >> "(int:i32 (!add 'a 'b))",
   Rule("(addi (subi (int 'a) x) (int 'b))") >> "(subi:i32 (!add 'a 'b) x)",
+  Rule("(addi (subi 'a x) y)") >> "(subi:i32 y x)",
 
-  Rule("(addl x (int 'a))") >> "x" when { return imm("'a") == 0; },
+  Rule("(addl x (int64 'a))") >> "x" when zero,
 
   Rule("(subi (int 'a) (int 'b))") >> "(int:i32 (!sub 'a 'b))",
-  Rule("(subi (int 'a) (subi x y))") >> "(subi:i32 y x)" when { return imm("'a") == 0; },
+  Rule("(subi (int 'a) (subi x y))") >> "(subi:i32 y x)" when zero,
   Rule("(subi (subi (int 'a) x) (int 'b))") >> "(subi:i32 (!sub 'a 'b) x)",
+  Rule("(subi x (int64 'a))") >> "x" when zero,
+  Rule("(subi (addi x y) (addi x z))") >> "(subi:i32 y z)",
+  Rule("(subi (addi y x) (addi z x))") >> "(subi:i32 y z)",
+  Rule("(subi x (addi x y))") >> "(subi:i32 (int:i32 0) y)",
+  Rule("(subi x (addi y x))") >> "(subi:i32 (int:i32 0) y)",
+  Rule("(subi (addi x y) x)") >> "y",
+  Rule("(subi (addi (subi x z) y) (addi x y))") >> "z",
 
-  Rule("(sext (int 'a))") >> "(int:i32 'a)",
+  Rule("(subl (int64 'a) (int64 'b))") >> "(int64:i64 (!sub 'a 'b))",
+  Rule("(subl (int64 'a) (subl x y))") >> "(subl:i64 y x)" when zero,
+  Rule("(subl (subl (int64 'a) x) (int64 'b))") >> "(subl:i64 (!sub 'a 'b) x)",
+  Rule("(subl (addl x y) x)") >> "y",
+  Rule("(subl (addl y x) x)") >> "y",
+  Rule("(subl x (int64 'a))") >> "x" when zero,
+
+  Rule("(sext (int 'a))") >> "(int64:i64 'a)",
   
   Rule("(muli (int 'a) (int 'b))") >> "(int:i32 (!mul 'a 'b))",
   Rule("(divi (int 'a) (int 'b))") >> "(int:i32 (!div 'a 'b))",

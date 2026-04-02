@@ -13,10 +13,10 @@ Pass *makeHighDCE(ir::ModuleOp *module);
 static Rule rules[] = {
   Rule("(addw (movi 'a) (movi 'b))") >> "(movi:i32 (!add 'a 'b))",
   Rule("(addw x (movi 'a))") >> "(addwi:i32 x 'a)" when { return imm("'a") < 4096 && imm("'a") >= 0; },
-  Rule("(addx x (movi 'a))") >> "(addxi:i64 x 'a)" when { return imm("'a") < 4096 && imm("'a") >= 0; },
+  Rule("(addx x (movl 'a))") >> "(addxi:i64 x 'a)" when { return imm("'a") < 4096 && imm("'a") >= 0; },
   Rule("(subw (movi 'a) (movi 'b))") >> "(movi:i32 (!sub 'a 'b))",
   Rule("(subw x (movi 'a))") >> "(subwi:i32 x 'a)" when { return imm("'a") < 4096 && imm("'a") >= 0; },
-  Rule("(subx x (movi 'a))") >> "(subxi:i64 x 'a)" when { return imm("'a") < 4096 && imm("'a") >= 0; },
+  Rule("(subx x (movl 'a))") >> "(subxi:i64 x 'a)" when { return imm("'a") < 4096 && imm("'a") >= 0; },
   Rule("(mulw x (movi 'a))") >> "x" when { return imm("'a") == 1; },
   Rule("(mulw (movi 'a) (movi 'b))") >> "(movi:i32 (!mul 'a 'b))",
   Rule("(addwi x 'a)") >> "x" when { return imm("'a") == 0; },
@@ -121,13 +121,13 @@ bool InstCombine::rewrite(Op *op) const {
     //   add %out, %lhs, %rhs
     // =>
     //   add %out, %lhs, %1, #x
-    if (auto lsl = dyn_cast<LslWIOp>(rhs->def)) {
-      auto addw = builder.replace<AddXLslOp>(op, i64)->with(lhs, lsl->val());
+    if (auto lsl = dyn_cast<LslWIOp>(rhs->def); lsl && lsl->value <= 4) {
+      auto addw = builder.replace<AddSxtOp>(op, i64)->with(lhs, lsl->val());
       addw->value = lsl->value;
       return true;
     }
-    if (auto lsl = dyn_cast<LslWIOp>(lhs->def)) {
-      auto addw = builder.replace<AddXLslOp>(op, i64)->with(rhs, lsl->val());
+    if (auto lsl = dyn_cast<LslWIOp>(lhs->def); lsl && lsl->value <= 4) {
+      auto addw = builder.replace<AddSxtOp>(op, i64)->with(rhs, lsl->val());
       addw->value = lsl->value;
       return true;
     }
