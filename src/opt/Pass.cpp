@@ -125,6 +125,54 @@ Op *Pass::baseOf(Value *v) const {
   return nullptr;
 }
 
+bool nonHoistable(Op *op);
+
+std::set<Value*> Pass::getVariantsIn(DoWhileOp *loop) const {
+  std::set<Value*> variants(loop->getResults().begin(), loop->getResults().end());
+  std::set<Op*> storedGlobals;
+
+  // To do this, we must ensure GVN is performed and PropagateArray is done, to
+  // distinguish different arrays.
+  bool called = false;
+  bool unbased = false;
+  Pass::walk(loop, [&](Op *op) {
+    if (isa<ArrayStoreOp>(op) || isa<StoreOp>(op)) {
+      auto base = baseOf(op->val());
+      if (base)
+        storedGlobals.insert(base);
+      else
+        unbased = true;
+    }
+    if (isa<CallOp>(op))
+      called = true;
+  });
+
+  Pass::walk(loop, [&](Op *op) {
+    bool variant = false;
+    for (auto x : op->getOperands()) {
+      if (variants.count(x)) {
+        variant = true;
+        break;
+      }
+    }
+
+    if (isa<ArrayLoadOp>(op) || isa<LoadOp>(op)) {
+      auto base = baseOf(op->val());
+      if (unbased || !base || storedGlobals.count(base) || (isa<GlobalOp>(base) && called))
+        variant = true;
+    }
+    if (nonHoistable(op))
+      variant = true;
+
+    if (variant) {
+      for (auto r : op->getResults())
+        variants.insert(r);
+    }
+  });
+
+  return variants;
+}
+
 Pass::CallGraph Pass::calledGraph() const {
   CallGraph cg;
   for (auto fn : collectFunctions()) {

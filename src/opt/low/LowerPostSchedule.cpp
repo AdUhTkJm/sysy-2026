@@ -16,29 +16,23 @@ declare_local_pass(LowerPostSchedule) {
     assert(locs.size() == types.size());
 
     builder.setBefore(op);
-    ReadRegOp *adjustedSp = nullptr;
+    ReadRegOp *sp = nullptr;
     if (stackBytes > 0) {
-      auto rd = createAssignedRd(builder, sp);
-      auto sub = builder.create<AddXIOp>(i64)->with(rd->ret());
-      sub->value = -stackBytes;
-      assignment[sub->ret()] = sp;
-      auto wrSp = builder.create<WriteRegOp>()->with(sub->ret());
-      wrSp->reg = sp;
-      adjustedSp = createAssignedRd(builder, sp);
+      auto byte = stackBytes;
+      if (auto off = func->get<StackOffsetAttr>())
+        byte = std::max(byte, off->size);
+      func->set<StackOffsetAttr>(byte);
+      sp = createAssignedRd(builder, Reg::sp);
     }
 
     for (unsigned i = 0; i < op->getNumOperands(); i++) {
       auto val = op->val(i);
       const auto &loc = locs[i];
       if (!loc.inReg) {
-        auto st = builder.create<StrOp>()->with(adjustedSp->ret(), val);
+        auto st = builder.create<StrOp>()->with(sp->ret(), val);
         st->value = loc.stackOffset;
-      }
-    }
-    for (unsigned i = 0; i < op->getNumOperands(); i++) {
-      auto val = op->val(i);
-      const auto &loc = locs[i];
-      if (loc.inReg) {
+        st->set<IncomingStackArgAttr>();
+      } else {
         auto wr = builder.create<WriteRegOp>(unit)->with(val);
         wr->reg = loc.reg;
         assignment[wr->ret()] = (Reg) wr->reg;
@@ -47,14 +41,6 @@ declare_local_pass(LowerPostSchedule) {
     op->clearOperands();
     
     builder.setAfter(op);
-    if (stackBytes > 0) {
-      auto rd = createAssignedRd(builder, sp);
-      auto add = builder.create<AddXIOp>(i64)->with(rd->ret());
-      add->value = stackBytes;
-      assignment[add->ret()] = sp;
-      auto wrSp = builder.create<WriteRegOp>()->with(add->ret());
-      wrSp->reg = sp;
-    }
     if (op->getNumResults() > 0) {
       auto ret = op->ret();
       if (ret->type != unit) {

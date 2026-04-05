@@ -687,28 +687,43 @@ void Printer::dump(std::ostream &out) {
 }
 
 std::ostream &operator<<(std::ostream &os, const Op *op) {
+  if (!op)
+    return os << "<null op>\n";
+  
   printer.print(op);
   printer.dump(os);
   return os;
 }
 
 std::ostream &operator<<(std::ostream &os, const Value *v) {
+  if (!v)
+    return os << "<null value>";
+
   return os << printer.str(v);
 }
 
 std::ostream &operator<<(std::ostream &os, const Block *bb) {
+  if (!bb)
+    return os << "<null block>";
+
   printer.print(bb);
   printer.dump(os);
   return os;
 }
 
 std::ostream &operator<<(std::ostream &os, const Region *region) {
+  if (!region)
+    return os << "<null region>";
+
   printer.print(region);
   printer.dump(os);
   return os;
 }
 
 std::ostream &operator<<(std::ostream &os, const Type *type) {
+  if (!type)
+    return os << "<null type>";
+
   printer.printType(os, type);
   return os;
 }

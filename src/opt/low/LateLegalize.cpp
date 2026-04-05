@@ -184,6 +184,8 @@ void LateLegalize::relocateAlloca(FuncOp *func) {
   });
 
   int total = 0;
+  if (auto off = func->get<StackOffsetAttr>())
+    total = off->size;
   std::map<AllocaOp*, int> offsets;
   std::vector<Op*> clean;
 

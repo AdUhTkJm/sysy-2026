@@ -135,34 +135,42 @@ const Expr::ExprImpl *Expr::ExprImpl::add(const ExprImpl *const *begin, const Ex
   std::unordered_map<const ExprImpl *, int> coeff;
 
   for (auto t : terms) {
-    switch (t->type) {
-    case ConstInt:
+    if (t->type == ConstInt) {
       sum += t->vi;
-      break;
-    case Parameter:
-    case Indvar:
-      coeff[t] += 1;
-      break;
-    case Mul:
-      if (t->nops == 2) {
-        auto l = t->ops[0], r = t->ops[1];
-        if (l->type != ConstInt) {
-          if (r->type != ConstInt)
-            goto normal;
-          std::swap(l, r);
-        }
-
-        // Now `l` is a const int.
-        if (r->type != Parameter && r->type != Indvar)
-          goto normal;
-
-        coeff[r] += l->vi;
-      }
-      break;
-    default:
-    normal:
-      args.push_back(t);
+      continue;
     }
+
+    // Try to extract an integer coefficient from multiplicative terms of any arity.
+    if (t->type == Mul) {
+      int c = 1;
+      ExprList nonconst;
+      for (unsigned i = 0; i < t->nops; i++) {
+        auto op = t->ops[i];
+        if (op->type == ConstInt)
+          c *= op->vi;
+        else
+          nonconst.push_back(op);
+      }
+
+      if (nonconst.empty()) {
+        // Pure constant product.
+        sum += c;
+        continue;
+      }
+
+      const ExprImpl *base = nullptr;
+      if (nonconst.size() == 1)
+        base = nonconst[0];
+      else
+        // Rebuild a Mul node for the non-const factors (they're already canonicalized by flatten()/mul()).
+        base = intern(Key(Mul, nonconst.size(), nonconst.data()));
+
+      coeff[base] += c;
+      continue;
+    }
+
+    // Parameter, Indvar, or any other non-Mul term: treat as base with coefficient 1.
+    coeff[t] += 1;
   }
 
   // Synthesize `coeff`.

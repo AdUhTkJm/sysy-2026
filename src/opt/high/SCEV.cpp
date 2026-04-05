@@ -232,17 +232,19 @@ void SCEV::evolve(DoWhileOp *loop) {
       continue;
 
     auto delta = (v.step(inc) - v).simplify();
-    // This value increments by zero. No need to do anything to it.
+    std::cerr << "\nconsidering: " << k << "\n";
+    std::cerr << v << ": " << v.step(inc) - v << "; " << delta << "\n";
     std::optional<int> recordVi;
     if (delta.impl->type == Expr::Type::ConstInt) {
       int vi = delta.impl->vi;
+      // This value increments by zero. No need to do anything to it.
       if (vi == 0)
         continue;
     
       // The value `r` increases identically as `k`.
       // This means we don't need to introduce another induction variable;
       // we only need to compute their difference beforehand.
-      if (auto it = repr.find(vi); it != repr.end()) {
+      if (auto it = repr.find(vi); it != repr.end() && false /*Temp. disable; the optimization effect isn't good*/) {
         auto [r, rStart] = it->second;
         if (k->type != r->type)
           continue;
@@ -261,11 +263,12 @@ void SCEV::evolve(DoWhileOp *loop) {
         deferred[k] = add->ret();
         continue;
       }
+      // Otherwise, it's just another normal induction variable,
+      // but we record the constant integer by which it increases.
       recordVi = vi;
     }
 
-    builder.setBefore(k->def);
-    // The increment carries something in the if-statement.
+    builder.setBefore(cond);
     Value *increment = generate(ind, delta);
     if (!increment)
       continue;

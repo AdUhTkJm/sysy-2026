@@ -13,12 +13,16 @@ static Rule rules[] = {
   Rule("(addi x (int 'a))") >> "x" when zero,
   Rule("(addi (int 'a) (int 'b))") >> "(int:i32 (!add 'a 'b))",
   Rule("(addi (subi (int 'a) x) (int 'b))") >> "(subi:i32 (!add 'a 'b) x)",
+  Rule("(addi (addi x y) (subi z y))") >> "(addi:i32 x z)",
   Rule("(addi (subi 'a x) y)") >> "(subi:i32 y x)",
 
   Rule("(addl x (int64 'a))") >> "x" when zero,
 
   Rule("(subi (int 'a) (int 'b))") >> "(int:i32 (!sub 'a 'b))",
+  Rule("(subi x (int 'a))") >> "x" when zero,
   Rule("(subi (int 'a) (subi x y))") >> "(subi:i32 y x)" when zero,
+  Rule("(subi (subi x y) x)") >> "(subi:i32 (int:i32 0) y)",
+  Rule("(subi (subi x y) y)") >> "(subi:i32 (int:i32 0) x)",
   Rule("(subi (subi (int 'a) x) (int 'b))") >> "(subi:i32 (!sub 'a 'b) x)",
   Rule("(subi x (int64 'a))") >> "x" when zero,
   Rule("(subi (addi x y) (addi x z))") >> "(subi:i32 y z)",
@@ -29,6 +33,7 @@ static Rule rules[] = {
   Rule("(subi (addi (subi x z) y) (addi x y))") >> "z",
 
   Rule("(subl (int64 'a) (int64 'b))") >> "(int64:i64 (!sub 'a 'b))",
+  Rule("(subi x (int64 'a))") >> "x" when zero,
   Rule("(subl (int64 'a) (subl x y))") >> "(subl:i64 y x)" when zero,
   Rule("(subl (subl (int64 'a) x) (int64 'b))") >> "(subl:i64 (!sub 'a 'b) x)",
   Rule("(subl (addl x y) x)") >> "y",

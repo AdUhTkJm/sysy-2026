@@ -23,13 +23,18 @@ declare_pass(PropagateArray,
 
     // Collect all functions called.
     for_all(CallOp, func) {
-      for (unsigned i = 1; i < op->getNumOperands(); i++) {
+      // Iterate from high to low: specializing removes operands from `op`,
+      // which would otherwise shift indices and cause us to skip arguments.
+      for (int i = (int)op->getNumOperands() - 1; i >= 1; i--) {
         const auto *arg = op->val(i);
         if (arg->type->kind != Type::ptr)
           continue;
 
         auto callee = cast<FuncOp>(op->val()->def);
-        auto global = cast<GetGlobalOp>(arg->def)->val();
+        auto get = dyn_cast<GetGlobalOp>(arg->def);
+        if (!get)
+          continue;
+        auto global = get->val();
         if (specialize(callee, i, global)) {
           mark_changed;
           queue.push_back(callee);
@@ -87,6 +92,7 @@ bool PropagateArray::specialize(FuncOp *func, unsigned i, Value *v) {
   // Create (or retrieve) the specialized version of this function.
   FuncOp *spec;
   bool changed = false;
+  bool updated = false;
   auto key = std::make_tuple(func, i, v);
   if (auto it = specs.find(key); it != specs.end())
     spec = it->second;
@@ -97,10 +103,27 @@ bool PropagateArray::specialize(FuncOp *func, unsigned i, Value *v) {
     spec = cast<FuncOp>(builder.clone(func));
     spec->name = "_" + std::to_string(index++) + func->name;
 
+    // `builder.clone()` may not remap `ArgDimAttr`'s `Value*` keys to the
+    // cloned function's argument `Value*`s. Rebuild it based on result index.
+    if (auto argDims = func->get<ArgDimAttr>()) {
+      std::map<Value*, std::vector<int>> dimmap;
+      for (auto &[oldArg, dims] : argDims->dims) {
+        auto idx = func->getResultIndex(oldArg);
+        dimmap[spec->ret(idx)] = dims;
+      }
+      spec->set<ArgDimAttr>(dimmap);
+    }
+
     // Replace the i'th argument with the global `v`.
     builder.setToStart(spec->getRegion());
     auto newg = builder.create<GetGlobalOp>(Type::pointer(v->type))->with(v);
-    spec->ret(i)->replaceAllUsesWith(newg->ret());
+    auto removed = spec->ret(i);
+    removed->replaceAllUsesWith(newg->ret());
+    if (auto argDims = spec->get<ArgDimAttr>()) {
+      auto dimmap = argDims->dims;
+      dimmap.erase(removed);
+      spec->set<ArgDimAttr>(dimmap);
+    }
     spec->removeResult(i);
     specs[key] = spec;
     changed = true;
@@ -110,6 +133,7 @@ bool PropagateArray::specialize(FuncOp *func, unsigned i, Value *v) {
   for (auto op : calls) {
     op->setOperand(0, spec->ret());
     op->removeOperand(i);
+    updated = true;
   }
 
   // Specially, if the function calls itself, then the calls to itself has not 
@@ -120,9 +144,10 @@ bool PropagateArray::specialize(FuncOp *func, unsigned i, Value *v) {
       continue;
 
     op->removeOperand(i);
+    updated = true;
   }
 
-  return changed;
+  return changed || updated;
 }
 
 }

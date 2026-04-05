@@ -7,6 +7,4 @@ using namespace ir;
 
 namespace opt {
 
-std::set<Value*> getVariantsIn(DoWhileOp *loop);
-
 }

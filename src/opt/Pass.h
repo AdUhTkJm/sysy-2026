@@ -110,6 +110,8 @@ protected:
   ir::Op *directBaseOf(ir::Op *op) const;
   ir::Op *baseOf(ir::Value *v) const;
 
+  std::set<ir::Value*> getVariantsIn(ir::DoWhileOp *loop) const;
+
   // u -> v means `u` is called by `v`.
   CallGraph calledGraph() const;
   // u -> v means `u` calls `v`.

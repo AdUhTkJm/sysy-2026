@@ -22,44 +22,6 @@ declare_local_pass(LICM,
 ) {
   for_all(DoWhileOp, func)
     lift(op);
-
-  // makeHighGVN(module)->run();
-}
-
-std::set<Value*> getVariantsIn(DoWhileOp *loop) {
-  std::set<Value*> variants(loop->getResults().begin(), loop->getResults().end());
-  std::set<Value*> storedGlobals;
-
-  // To do this, we must ensure GVN is performed and PropagateArray is done, to
-  // distinguish different arrays.
-  bool called = false;
-  Pass::walk(loop, [&](Op *op) {
-    if (isa<ArrayStoreOp>(op) || isa<StoreOp>(op))
-      storedGlobals.insert(op->val());
-    called = true;
-  });
-
-  Pass::walk(loop, [&](Op *op) {
-    bool variant = false;
-    for (auto x : op->getOperands()) {
-      if (variants.count(x)) {
-        variant = true;
-        break;
-      }
-    }
-
-    if ((isa<ArrayLoadOp>(op) || isa<LoadOp>(op)) && (storedGlobals.count(op->val()) || called))
-      variant = true;
-    if (nonHoistable(op))
-      variant = true;
-
-    if (variant) {
-      for (auto r : op->getResults())
-        variants.insert(r);
-    }
-  });
-
-  return variants;
 }
 
 void LICM::lift(DoWhileOp *loop) {

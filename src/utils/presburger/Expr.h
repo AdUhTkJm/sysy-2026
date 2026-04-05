@@ -137,7 +137,7 @@ public:
       return node;
     }
 
-    void dump(std::ostream &os) const;
+    void dump(std::ostream &os = std::cerr) const;
     const ExprImpl *step(ir::Value *v) const;
     const ExprImpl *step(int v) const;
 
@@ -206,7 +206,7 @@ public:
   Expr operator*(const Expr &other) const { return ExprImpl::mul(impl, other.impl); }
   Expr operator/(const Expr &other) const { return ExprImpl::create(ExprImpl::Div, impl, other.impl); }
 
-  void dump(std::ostream &os) const;
+  void dump(std::ostream &os = std::cerr) const;
   Expr step(ir::Value *offset) const;
   Expr simplify() const;
 

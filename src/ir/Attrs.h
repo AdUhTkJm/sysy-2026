@@ -114,6 +114,13 @@ class RecursiveAttr : public AttrImpl<RecursiveAttr> {};
 // Marks `LdrOp` of a function parameter passed on the stack (offset patched in LateLegalize).
 class IncomingStackArgAttr : public AttrImpl<IncomingStackArgAttr> {};
 
+// Marks the additional stack offset introduced by stack arguments for calls in the function.
+class StackOffsetAttr : public AttrImpl<StackOffsetAttr> {
+public:
+  int size;
+  StackOffsetAttr(int i): size(i) {}
+};
+
 using Attributes = std::vector<const Attr*>;
 
 }

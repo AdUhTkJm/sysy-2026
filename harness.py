@@ -3,6 +3,8 @@ import subprocess
 import time
 import os
 import sys
+import argparse
+import concurrent.futures
 from pathlib import Path
 
 TEST_ROOT = Path("test")
@@ -11,101 +13,184 @@ COMPILER = "build/hcc"
 QEMU = "qemu-aarch64-static"
 RESULT_FILE = Path("results.json")
 GCC = "aarch64-linux-gnu-gcc"
+DEFAULT_QEMU_TIMEOUT_S = 10.0
 
 # Remove trailing spaces on each line.
 def normalize(text: str):
   return "\n".join(line.rstrip() for line in text.splitlines())
 
-def run_test(test_path: Path) -> tuple[bool, None | float]:
-  name = test_path.stem
-  asm_path = TEMP_DIR / (name + ".s")
-  exe_path = TEMP_DIR / (name + ".exe")
+def _test_temp_id(test_path: Path) -> str:
+  """
+  Create a unique id for temp artifacts.
+  Using relative path avoids collisions when different folders share a stem.
+  """
+  rel = test_path.relative_to(TEST_ROOT)
+  return rel.as_posix().replace("/", "__")
 
-  hcc = subprocess.run(
-    [COMPILER, str(test_path), "-o", str(asm_path)],
-    stdout=subprocess.PIPE,
-    stderr=subprocess.PIPE,
-    text=True,
-    env={"ASAN_OPTIONS": "detect_leaks=0"}
+def run_test(test_path: Path, *, qemu_timeout_s: float) -> tuple[bool, None | float, str]:
+  asm_path = TEMP_DIR / (_test_temp_id(test_path) + ".s")
+  exe_path = TEMP_DIR / (_test_temp_id(test_path) + ".exe")
+
+  def _truncate(s: str, n: int = 200) -> str:
+    return (s[:n] + "...") if len(s) > n else s
+
+  def _cleanup():
+    for p in (asm_path, exe_path):
+      try:
+        if p.exists():
+          os.remove(p)
+      except OSError:
+        ...
+
+  try:
+    hcc = subprocess.run(
+      [COMPILER, str(test_path), "-o", str(asm_path)],
+      stdout=subprocess.PIPE,
+      stderr=subprocess.PIPE,
+      text=True,
+      env={"ASAN_OPTIONS": "detect_leaks=0"},
+    )
+
+    if hcc.returncode != 0:
+      return False, None, f"hcc error (rc={hcc.returncode}): {test_path}"
+
+    # c test/lib.c -x assembler $output -o temp/a.out -static
+    gcc = subprocess.run(
+      [GCC, "-x", "c", "test/lib.c", "-x", "assembler", asm_path, "-o", exe_path, "-static"],
+      stdout=subprocess.PIPE,
+      stderr=subprocess.PIPE,
+      text=True,
+    )
+    if gcc.returncode != 0:
+      return False, None, f"gcc error (rc={gcc.returncode}): {test_path}"
+
+    try:
+      if asm_path.exists():
+        os.remove(asm_path)
+    except OSError:
+      ...
+
+    # Optional stdin
+    input_file = test_path.with_suffix(".in")
+    qemu_input = input_file.read_text() if input_file.exists() else None
+
+    qemu_start = time.perf_counter()
+    try:
+      qemu = subprocess.run(
+        [QEMU, str(exe_path)],
+        input=qemu_input,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        timeout=qemu_timeout_s,
+      )
+    except subprocess.TimeoutExpired:
+      qemu_elapsed = time.perf_counter() - qemu_start
+      return False, None, f"timeout after {qemu_timeout_s}s (ran {qemu_elapsed:.2f}s): {test_path}"
+    finally:
+      try:
+        if exe_path.exists():
+          os.remove(exe_path)
+      except OSError:
+        ...
+
+    elapsed = time.perf_counter() - qemu_start
+
+    # 4. Load expected output
+    expected_file = test_path.with_suffix(".out")
+    expected_lines = expected_file.read_text().splitlines()
+
+    expected_return = int(expected_lines[-1])
+    expected_stdout = "\n".join(expected_lines[:-1])
+
+    actual_stdout = qemu.stdout
+    actual_return = qemu.returncode
+
+    # Normalize trailing spaces
+    expected_stdout = normalize(expected_stdout)
+    actual_stdout = normalize(actual_stdout)
+
+    if expected_stdout != actual_stdout:
+      return (
+        False,
+        None,
+        f"stdout mismatch: {test_path}\nexpected(first 200): {_truncate(expected_stdout)}\ngot(first 200): {_truncate(actual_stdout)}",
+      )
+
+    if expected_return != actual_return:
+      return False, None, f"return code mismatch (expected {expected_return}, got {actual_return}): {test_path}"
+
+    return True, elapsed, f"ok: {test_path}"
+  finally:
+    _cleanup()
+
+def _iter_functional_tests() -> list[Path]:
+  tests: list[Path] = []
+  for file in TEST_ROOT.rglob("*.sy"):
+    name = str(file)
+    if "performance" in name or "h_functional" in name or "custom" in name:
+      continue
+    tests.append(file)
+  return tests
+
+def main() -> int:
+  parser = argparse.ArgumentParser(description="Run functional .sy tests")
+  parser.add_argument("--jobs", type=int, default=min(32, os.cpu_count() or 1), help="Parallel worker count")
+  parser.add_argument(
+    "--timeout",
+    type=float,
+    default=float(os.environ.get("SY_TEST_QEMU_TIMEOUT_S", DEFAULT_QEMU_TIMEOUT_S)),
+    help="Per-test QEMU timeout in seconds",
   )
+  parser.add_argument("--max-tests", type=int, default=0, help="If >0, only run first N tests")
+  args = parser.parse_args()
 
-  if hcc.returncode != 0:
-    print(f"hcc error: {hcc.returncode}")
-    try: os.remove(asm_path)
-    except: ...
-    return False, None
-  
-  # c test/lib.c -x assembler $output -o temp/a.out -static
-  gcc = subprocess.run(
-    [GCC, "-x", "c", "test/lib.c", "-x", "assembler", asm_path, "-o", exe_path, "-static"],
-    stdout=subprocess.PIPE,
-    stderr=subprocess.PIPE,
-    text=True,
-  )
-  if gcc.returncode != 0:
-    print(f"gcc error: {gcc.returncode}")
-    try: os.remove(exe_path)
-    except: ...
-    return False, None
+  TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
-  os.remove(asm_path)
+  tests = _iter_functional_tests()
+  if args.max_tests and args.max_tests > 0:
+    tests = tests[: args.max_tests]
 
-  input_file = test_path.with_suffix(".in")
-  input = None
-  if input_file.exists():
-    input = input_file.read_text()
+  if not tests:
+    print("No tests found.", file=sys.stderr)
+    return 0
 
-  start = time.perf_counter()
-  qemu = subprocess.run(
-    [QEMU, str(exe_path)],
-    input=input,
-    stdout=subprocess.PIPE,
-    stderr=subprocess.PIPE,
-    text=True,
-  )
-  end = time.perf_counter()
-  os.remove(exe_path)
+  timemap: dict[str, float] = {}
+  failures: list[str] = []
 
-  elapsed = end - start
+  with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as ex:
+    futures: dict[concurrent.futures.Future, Path] = {}
+    for t in tests:
+      fut = ex.submit(run_test, t, qemu_timeout_s=args.timeout)
+      futures[fut] = t
 
-  # 4. Load expected output
-  expected_file = test_path.with_suffix(".out")
-  expected_lines = expected_file.read_text().splitlines()
+    for fut in concurrent.futures.as_completed(futures):
+      t = futures[fut]
+      try:
+        passed, elapsed, msg = fut.result()
+      except Exception as e:
+        passed = False
+        elapsed = None
+        msg = f"exception: {e} ({t})"
 
-  expected_return = int(expected_lines[-1])
-  expected_stdout = "\n".join(expected_lines[:-1])
+      if passed:
+        if elapsed is not None:
+          timemap[t.stem] = float(elapsed)
+      else:
+        failures.append(msg)
+        print(f"FAIL: {t} ({msg})", file=sys.stderr)
 
-  actual_stdout = qemu.stdout
-  actual_return = qemu.returncode
+  if failures:
+    print(f"\n{len(failures)} test(s) failed.", file=sys.stderr)
+    for f in failures[:50]:
+      print(f"- {f}", file=sys.stderr)
+    if len(failures) > 50:
+      print(f"- (and {len(failures) - 50} more...)", file=sys.stderr)
+    return 1
 
-  # Normalize trailing spaces
-  expected_stdout = normalize(expected_stdout)
-  actual_stdout = normalize(actual_stdout)
+  if len(timemap):
+    print(timemap, file=sys.stderr)
+  return 0
 
-  if expected_stdout != actual_stdout:
-    print(f"expected: {expected_stdout}")
-    print(f"got: {actual_stdout}")
-    return False, None
-  
-  if expected_return != actual_return:
-    print(f"expected return: {expected_return}")
-    print(f"got: {actual_return}")
-    return False, None
-
-  return True, elapsed
-
-timemap = {}
-for file in TEST_ROOT.rglob("*.sy"):
-  name = str(file)
-  if "performance" in name or "h_functional" in name or "custom" in name:
-    continue
-  print(f"running: {file}", file=sys.stderr)
-
-  passed, elapsed = run_test(file)
-  if not passed:
-    print("error!", file=sys.stderr)
-  if elapsed:
-    timemap[file.stem] = elapsed
-
-if len(timemap):
-  print(timemap, file=sys.stderr)
+if __name__ == "__main__":
+  raise SystemExit(main())
