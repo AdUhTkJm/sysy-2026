@@ -442,6 +442,11 @@ void CodeGen::emitStmt(ASTNode *node) {
       if (!decl->init)
         return;
 
+      if (auto vi = dyn_cast<IntNode>(decl->init)) {
+        global->set<ConstIArrAttr>(std::vector { vi->value });
+        return;
+      }
+
       Builder::Guard guard(builder);
       builder.setToStart(table[constructor]->def->getRegion()->getFirstBlock());
       auto value = emitExpr(decl->init);

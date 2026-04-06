@@ -323,6 +323,14 @@ void LateLegalize::ensureImmRange(Op *op) {
     assignment[movk->ret()] = assignment[movi->ret()];
     return;
   }
+  if (auto movl = dyn_cast<MovLOp>(op); movl && (unsigned) movl->value > 0xffff) {
+    builder.setAfter(movl);
+    auto movk = builder.create<MovKOp>(i64);
+    movk->value = (unsigned) movl->value >> 16;
+    movl->value &= 0xffff;
+    assignment[movk->ret()] = assignment[movl->ret()];
+    return;
+  }
 }
 
 }

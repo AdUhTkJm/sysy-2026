@@ -22,7 +22,8 @@ declare_pass(InlineGlobalStore) {
   // Note that the attributes are immutable, and hence we need to store it elsewhere.
   std::map<GlobalOp*, std::vector<int>> inlined;
   std::map<GlobalOp*, std::vector<float>> inlinedF;
-  for (auto op = main->getRegion()->getFirstOp(); op;) {
+  bool doArray = true, doScalar = true;
+  for (auto op = main->getRegion()->getFirstOp(); op && (doArray || doScalar);) {
     auto next = op->nextOp();
     if (isa<ArrayStoreOp>(op)) {
       auto val = op->val(op->getNumOperands() - 1), addr = op->val(0);
@@ -46,8 +47,19 @@ declare_pass(InlineGlobalStore) {
         op->erase();
       }
     }
+    if (isa<StoreOp>(op)) {
+      auto val = op->val(1)->def, addr = op->val(0)->def;
+      if (auto vi = dyn_cast<IntOp>(val); vi && isa<GetGlobalOp>(addr)) {
+        auto global = cast<GlobalOp>(addr->val(0)->def);
+        inlined[global] = { vi->value };
+        op->erase();
+      }
+    }
+
     if (contains<ArrayLoadOp>(op))
-      break;
+      doArray = false;
+    if (contains<LoadOp>(op))
+      doScalar = false;
     end: op = next;
   }
 

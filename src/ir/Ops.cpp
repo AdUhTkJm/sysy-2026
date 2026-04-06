@@ -1,4 +1,5 @@
 #include "Ops.h"
+#include "Attrs.h"
 #include "Printer.h"
 #include "../utils/DataStructure.h"
 #include <algorithm>
@@ -54,7 +55,7 @@ void PhiOp::replaceIncoming(Block *bb, Block *after) {
 
 #define isa(Ty) isa<Ty>(op) ||
 bool hasSideEffect(Op *op) {
-  return (impure_op_list(isa) false);
+  return (impure_op_list(isa) (isa<CallOp>(op) && op->has<UnerasableAttr>()));
 }
 
 bool isTerminator(Op *op) {

@@ -109,6 +109,9 @@ Op *Pass::baseOf(Value *v) const {
   if (isa<GetGlobalOp>(op))
     return op->val()->def;
 
+  if (isa<ArrayLoadOp>(op) || isa<LoadOp>(op))
+    return baseOf(op->val());
+
   if (isa<AddXOp>(op) || isa<AddLOp>(op)) {
     if (auto k = baseOf(op->val(0)))
       return k;

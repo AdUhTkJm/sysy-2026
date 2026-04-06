@@ -13,15 +13,16 @@ namespace opt {
   isa<Ty>(op) ||
 
 static bool allowed(Op *op) {
-  return allowed_list(allow) false;
+  return allowed_list(allow) (isa<CallOp>(op) && !op->has<UnerasableAttr>());
 }
 
 Pass *makeHighDCE(ModuleOp *module);
+Pass *makePure(ModuleOp *module);
 
 struct Key {
   int id;
   int loc;
-  std::vector<int> operand;
+  std::vector<int> operands;
   union {
     int vi;
     float vf;
@@ -32,11 +33,11 @@ struct Key {
       return diff < 0;
     if (auto diff = loc - other.loc)
       return diff < 0;
-    if (auto diff = (int) operand.size() - (int) other.operand.size())
+    if (auto diff = (int) operands.size() - (int) other.operands.size())
       return diff < 0;
-    for (unsigned i = 0; i < operand.size(); i++) {
-      if (operand[i] != other.operand[i])
-        return operand[i] < other.operand[i];
+    for (unsigned i = 0; i < operands.size(); i++) {
+      if (operands[i] != other.operands[i])
+        return operands[i] < other.operands[i];
     }
 
     if (id == IntOp::id)
@@ -80,6 +81,8 @@ declare_pass(HighGVN,
     void invalidate() { invalidated = true; }
   };
 ) {
+  makePure(module)->run();
+
   // Calls and get_globals refer to globally declared values.
   // We first add them into our tables.
   for (auto top : *module->getRegion()->getFirstBlock()) {
@@ -117,10 +120,10 @@ Key HighGVN::hash(Value *v) const {
       std::cerr << "domination violated: " << v << "\n";
       assert(false && "bad symbol");
     }
-    k.operand.push_back(symbols.at(x));
+    k.operands.push_back(symbols.at(x));
   }
   if (isa<AddIOp>(op) || isa<MulIOp>(op))
-    std::sort(k.operand.begin(), k.operand.end());
+    std::sort(k.operands.begin(), k.operands.end());
 
   if (auto i = dyn_cast<IntOp>(op))
     k.vi = i->value;

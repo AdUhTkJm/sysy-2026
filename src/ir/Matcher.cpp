@@ -253,6 +253,16 @@ Op *buildEmptyImpl(Builder &builder, const Pattern *pattern, const Env &env) {
     return env.vals.at(pattern->name)->def;
 
   assert(pattern->kind != Pattern::Imm);
+  Value *operands[3];
+  int i = 0;
+  for (; i < 3; i++) {
+    auto ch = pattern->children[i];
+    if (!ch)
+      break;
+
+    operands[i] = build(builder, ch, env)->ret();
+  }
+
   Op *op;
   if (strlen(pattern->tyname) == 0)
     op = builder.create<T>();
@@ -260,14 +270,9 @@ Op *buildEmptyImpl(Builder &builder, const Pattern *pattern, const Env &env) {
     auto ty = env.types.at(pattern->tyname);
     op = builder.create<T>(ty);
   }
-  
-  for (int i = 0; i < 3; i++) {
-    auto ch = pattern->children[i];
-    if (!ch)
-      break;
 
-    op->pushOperand(build(builder, ch, env)->ret());
-  }
+  for (int j = 0; j < i; j++)
+    op->pushOperand(operands[j]);
   return op;
 }
 

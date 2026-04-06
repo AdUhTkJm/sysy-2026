@@ -55,7 +55,7 @@ while [[ $# -gt 0 ]] do
     shift 2;;
   -g|--gdb)
     gdb=1; shift;;
-  -clang)
+  -c|--clang)
     clang=1; shift;;
   -p|--print-before)
     if [[ $# -lt 2 ]]; then
@@ -85,6 +85,20 @@ while [[ $# -gt 0 ]] do
   -a|--print-all)
     printall=1
     shift;;
+  -d|--directory)
+    if [[ $# -lt 2 ]]; then
+      die "expected test directory"
+    fi
+    
+    case "$2" in
+    f) dir=functional;;
+    h) dir=h_functional;;
+    p|ap) dir=performance;;
+    rp) dir=rv-performance;;
+    rfp) dir=rv-final-performance;;
+    *) dir=$2;;
+    esac
+    shift 2;;
   *)
     die "unknown argument: $1";;
   esac
@@ -113,6 +127,15 @@ if [[ -n $asm ]]; then
   fi
   echo; echo done.
   exit 0
+fi
+
+if [[ -n $dir ]]; then
+  ./harness.py -d $dir
+  exit 0
+fi
+
+if [[ -n $clang && -z $testcase ]]; then
+  die "must specify a test case to compile with clang"
 fi
 
 if [[ -n $testcase ]]; then

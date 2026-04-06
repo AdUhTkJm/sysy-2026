@@ -24,15 +24,23 @@ declare_local_pass(LowerArray,
 
     builder.replace<StoreOp>(op)->with(dest, val);
   }
+
+  std::unordered_map<ArrayLoadOp*, std::vector<int>> dimmap;
+
+  // It is possible that ArrayLoadOp only dereferences a certain amount of dimensions,
+  // but not all.
+  // We must collect the dimensions beforehand, since lowered ArrayLoads lose this
+  // information.
+  for_all(ArrayLoadOp, func)
+    dimmap[op] = getDim(op->val());
+  
   for_all(ArrayLoadOp, func) {
     builder.setBefore(op);
 
-    Value *dest = op->val(0);
-    auto dims = getDim(dest);
-    
+    const auto &dims = dimmap[op];
+    auto dest = op->val();
+
     int stride = asmSize(op->ret()->type);
-    // It is possible that ArrayLoadOp only dereferences a certain amount of dimensions,
-    // but not all.
     int i = dims.size() - 1;
     while (i + 1 >= (int) op->getNumOperands())
       stride *= dims[i--];
@@ -57,14 +65,30 @@ declare_local_pass(LowerArray,
   }
 }
 
+int derefedDims(Value *addr) {
+  auto op = addr->def;
+  if (isa<ArrayLoadOp>(op))
+    return derefedDims(op->val()) + op->getNumOperands() - 1;
+
+  return 0;
+}
+
 std::vector<int> LowerArray::getDim(Value *addr) const {
   auto base = baseOf(addr);
+  int derefed = derefedDims(addr);
+  std::vector<int> result;
+  const std::vector<int> *dims;
   if (auto dim = base->get<DimAttr>())
-    return dim->dims;
-
-  // This has to be a function argument. TODO: no function argument can be an array.
-  assert(isa<FuncOp>(base));
-  return base->get<ArgDimAttr>()->dims.at(addr);
+    dims = &dim->dims;
+  else {
+    assert(isa<FuncOp>(base));
+    dims = &base->get<ArgDimAttr>()->dims.at(addr);
+  }
+    
+  result.reserve(dims->size() - derefed);
+  for (unsigned i = derefed; i < dims->size(); i++)
+    result.push_back((*dims)[i]);
+  return result;
 }
 
 }

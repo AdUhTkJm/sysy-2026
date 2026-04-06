@@ -5,6 +5,7 @@ import os
 import sys
 import argparse
 import concurrent.futures
+import json
 from pathlib import Path
 
 TEST_ROOT = Path("test")
@@ -13,7 +14,7 @@ COMPILER = "build/hcc"
 QEMU = "qemu-aarch64-static"
 RESULT_FILE = Path("results.json")
 GCC = "aarch64-linux-gnu-gcc"
-DEFAULT_QEMU_TIMEOUT_S = 10.0
+DEFAULT_QEMU_TIMEOUT_S = 3.0
 
 # Remove trailing spaces on each line.
 def normalize(text: str):
@@ -80,13 +81,12 @@ def run_test(test_path: Path, *, qemu_timeout_s: float) -> tuple[bool, None | fl
         [QEMU, str(exe_path)],
         input=qemu_input,
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
         text=True,
         timeout=qemu_timeout_s,
       )
     except subprocess.TimeoutExpired:
-      qemu_elapsed = time.perf_counter() - qemu_start
-      return False, None, f"timeout after {qemu_timeout_s}s (ran {qemu_elapsed:.2f}s): {test_path}"
+      return False, None, f"timeout after {qemu_timeout_s}s: {test_path}"
     finally:
       try:
         if exe_path.exists():
@@ -124,11 +124,11 @@ def run_test(test_path: Path, *, qemu_timeout_s: float) -> tuple[bool, None | fl
   finally:
     _cleanup()
 
-def _iter_functional_tests() -> list[Path]:
+def find_tests(dir: str) -> list[Path]:
   tests: list[Path] = []
   for file in TEST_ROOT.rglob("*.sy"):
     name = str(file)
-    if "performance" in name or "h_functional" in name or "custom" in name:
+    if not f"/{dir}/" in name:
       continue
     tests.append(file)
   return tests
@@ -139,15 +139,16 @@ def main() -> int:
   parser.add_argument(
     "--timeout",
     type=float,
-    default=float(os.environ.get("SY_TEST_QEMU_TIMEOUT_S", DEFAULT_QEMU_TIMEOUT_S)),
+    default=DEFAULT_QEMU_TIMEOUT_S,
     help="Per-test QEMU timeout in seconds",
   )
+  parser.add_argument("--directory", "-d", type=str, default="functional")
   parser.add_argument("--max-tests", type=int, default=0, help="If >0, only run first N tests")
   args = parser.parse_args()
 
   TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
-  tests = _iter_functional_tests()
+  tests = find_tests(args.directory)
   if args.max_tests and args.max_tests > 0:
     tests = tests[: args.max_tests]
 
@@ -178,18 +179,14 @@ def main() -> int:
           timemap[t.stem] = float(elapsed)
       else:
         failures.append(msg)
-        print(f"FAIL: {t} ({msg})", file=sys.stderr)
+        print(f"\nFAIL: {t}\n{msg}", file=sys.stderr)
 
   if failures:
     print(f"\n{len(failures)} test(s) failed.", file=sys.stderr)
-    for f in failures[:50]:
-      print(f"- {f}", file=sys.stderr)
-    if len(failures) > 50:
-      print(f"- (and {len(failures) - 50} more...)", file=sys.stderr)
-    return 1
 
   if len(timemap):
-    print(timemap, file=sys.stderr)
+    timemap = { k: f"{v:.4f}" for k, v in timemap.items() }
+    print(json.dumps(timemap, indent=2), file=sys.stderr)
   return 0
 
 if __name__ == "__main__":

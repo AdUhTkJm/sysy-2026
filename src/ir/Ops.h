@@ -72,8 +72,7 @@ public: \
 
 #define impure_op_list(X) \
   X(ExternCallOp) X(BranchOp) X(JumpOp) X(YieldOp) X(ConditionOp) \
-  X(StoreOp) X(CallOp) X(ArrayStoreOp) X(GlobalOp) X(ReturnOp) \
-  X(FuncOp) \
+  X(StoreOp) X(FuncOp) X(ArrayStoreOp) X(GlobalOp) X(ReturnOp) X(ModuleOp) \
   /* ARM operations */ \
   arm_branch_op_list(X) \
   X(StrOp) X(StpOp) X(BOp) X(BlOp) X(RetOp)

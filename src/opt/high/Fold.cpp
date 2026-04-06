@@ -12,11 +12,14 @@ namespace opt {
 static Rule rules[] = {
   Rule("(addi x (int 'a))") >> "x" when zero,
   Rule("(addi (int 'a) (int 'b))") >> "(int:i32 (!add 'a 'b))",
-  Rule("(addi (subi (int 'a) x) (int 'b))") >> "(subi:i32 (!add 'a 'b) x)",
+  Rule("(addi (subi (int 'a) x) (int 'b))") >> "(subi:i32 (int:i32 (!add 'a 'b)) x)",
+  Rule("(addi (addi x (int 'a)) (int 'b))") >> "(addi:i32 x (int:i32 (!add 'a 'b)))",
   Rule("(addi (addi x y) (subi z y))") >> "(addi:i32 x z)",
   Rule("(addi (subi 'a x) y)") >> "(subi:i32 y x)",
 
   Rule("(addl x (int64 'a))") >> "x" when zero,
+  Rule("(addl (int64 'a) (int64 'b))") >> "(int64:i64 (!add 'a 'b))",
+  Rule("(addl (addl x (int64 'a)) (int64 'b))") >> "(addl:i64 x (int64:i64 (!add 'a 'b)))",
 
   Rule("(subi (int 'a) (int 'b))") >> "(int:i32 (!sub 'a 'b))",
   Rule("(subi x (int 'a))") >> "x" when zero,
@@ -33,7 +36,7 @@ static Rule rules[] = {
   Rule("(subi (addi (subi x z) y) (addi x y))") >> "z",
 
   Rule("(subl (int64 'a) (int64 'b))") >> "(int64:i64 (!sub 'a 'b))",
-  Rule("(subi x (int64 'a))") >> "x" when zero,
+  Rule("(subl x (int64 'a))") >> "x" when zero,
   Rule("(subl (int64 'a) (subl x y))") >> "(subl:i64 y x)" when zero,
   Rule("(subl (subl (int64 'a) x) (int64 'b))") >> "(subl:i64 (!sub 'a 'b) x)",
   Rule("(subl (addl x y) x)") >> "y",

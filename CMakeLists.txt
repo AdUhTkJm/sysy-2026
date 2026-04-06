@@ -15,7 +15,7 @@ target_compile_options(hcc PRIVATE
   -Wall -Wextra -Wpedantic -Wno-gnu-anonymous-struct -Wno-nested-anon-types
   -Wno-variadic-macro-arguments-omitted -Wno-zero-length-array
   -fno-exceptions -fno-rtti -fdiagnostics-color=always -fsanitize=undefined,address
-  -g -std=c++17
+  -g -std=c++17 -O2
 )
 target_link_options(hcc PRIVATE
   -fsanitize=undefined,address

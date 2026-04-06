@@ -522,9 +522,8 @@ attr_printer(ConstIArrAttr) {
     os << iarr->value[0];
   for (unsigned i = 1; i + iarr->zeroSuffix < iarr->value.size(); i++)
     os << ", " << iarr->value[i];
-  if (iarr->value.size() > iarr->zeroSuffix)
-    os << ", ";
-  os << iarr->zeroSuffix << " x 0";
+  if (iarr->zeroSuffix > 0)
+    os << ", " << iarr->zeroSuffix << " x 0";
   os << ">"; 
 }
 
@@ -540,9 +539,14 @@ attr_printer(ConstFArrAttr) {
   os << ">"; 
 }
 
-attr_printer(ImpureAttr) {
+attr_printer(NonIdempotentAttr) {
   (void) attr;
-  os << "<impure>";
+  os << "<non-idempotent>";
+}
+
+attr_printer(UnerasableAttr) {
+  (void) attr;
+  os << "<no erase>";
 }
 
 attr_printer(RecursiveAttr) {

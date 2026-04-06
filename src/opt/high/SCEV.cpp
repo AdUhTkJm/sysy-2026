@@ -1,6 +1,5 @@
 #include "Common.h"
 #include "../../utils/presburger/Expr.h"
-#include <algorithm>
 #include <optional>
 
 using namespace pres;
@@ -195,16 +194,18 @@ void SCEV::evolve(DoWhileOp *loop) {
       return;
 
     auto v = op->val(0), w = op->val(1);
+    if (!pres.count(v) && !pres.count(w))
+      return;
+
     if (!pres.count(v)) {
-      if (!pres.count(w))
+      if (variants.count(v))
         return;
-      std::swap(v, w);
+      // `v` is a constant (a parameter).
+      pres[v] = Expr(v);
     }
-    // Now `v` is definitely in `incr`, but we don't know whether `w` is in it.
     if (!pres.count(w)) {
       if (variants.count(w))
         return;
-      // `w` is a constant (a parameter).
       pres[w] = Expr(w);
     }
     auto ev = pres.at(v), ew = pres.at(w);
@@ -212,7 +213,7 @@ void SCEV::evolve(DoWhileOp *loop) {
     auto ret = op->ret();
     if (isa<AddIOp>(op) || isa<AddLOp>(op))
       pres[ret] = ev + ew;
-    if (isa<SubIOp>(op))
+    if (isa<SubIOp>(op) || isa<SubLOp>(op))
       pres[ret] = ev - ew;
     if (isa<MulIOp>(op))
       pres[ret] = ev * ew;
@@ -232,8 +233,6 @@ void SCEV::evolve(DoWhileOp *loop) {
       continue;
 
     auto delta = (v.step(inc) - v).simplify();
-    std::cerr << "\nconsidering: " << k << "\n";
-    std::cerr << v << ": " << v.step(inc) - v << "; " << delta << "\n";
     std::optional<int> recordVi;
     if (delta.impl->type == Expr::Type::ConstInt) {
       int vi = delta.impl->vi;

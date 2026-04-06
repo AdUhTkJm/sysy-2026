@@ -14,7 +14,7 @@ declare_pass(HighDCE,
     walk<Postorder>(module, [&](Op *op) {
       if (std::all_of(op->getResults().begin(), op->getResults().end(), [](Value *v){
         return !v->used();
-      }) && !op->has<ImpureAttr>()) {
+      }) && !op->has<UnerasableAttr>() && !hasSideEffect(op)) {
         op->erase();
         mark_changed;
         return;
@@ -31,7 +31,6 @@ declare_pass(HighDCE,
       }
     });
   );
-  walk(module, [](Op *op) { op->remove<ImpureAttr>(); });
 }
 
 bool HighDCE::removeIfResults(IfOp *op) {

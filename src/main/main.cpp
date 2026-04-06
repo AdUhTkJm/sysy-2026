@@ -26,6 +26,7 @@ void populate(opt::PassManager &pm) {
   add_pass(RaiseArray);
   add_pass(PropagateArray);
   add_pass(InlineGlobalStore);
+  add_pass(FoldConstGlobal);
   add_pass(HighDCE);
   add_pass(Fold);
   add_pass(HighGVN);
