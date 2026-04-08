@@ -47,7 +47,8 @@ public: \
 
 #define arm_imm_op_list(X) \
   X(AddWIOp) X(AddXIOp) X(AddWLslOp) X(AddXLslOp) X(AddSxtOp) \
-  X(MovIOp) X(MovLOp) X(MovKOp) X(LdrOp) X(StrOp) X(LdpOp) X(StpOp) \
+  X(MovIOp) X(MovLOp) X(MovKOp) X(MovZOp) X(MovNOp) \
+  X(LdrOp) X(StrOp) X(LdpOp) X(StpOp) \
   X(EorWIOp) X(LdrLslOp) X(StrLslOp) X(LslWIOp) \
   X(SubWIOp) X(SubXIOp) X(AndWIOp) X(AndXIOp) 
 

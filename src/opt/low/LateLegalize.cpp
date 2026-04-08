@@ -323,12 +323,47 @@ void LateLegalize::ensureImmRange(Op *op) {
     assignment[movk->ret()] = assignment[movi->ret()];
     return;
   }
-  if (auto movl = dyn_cast<MovLOp>(op); movl && (unsigned) movl->value > 0xffff) {
+
+  if (auto movl = dyn_cast<MovLOp>(op)) {
+    int val = movl->value;
+
     builder.setAfter(movl);
-    auto movk = builder.create<MovKOp>(i64);
-    movk->value = (unsigned) movl->value >> 16;
-    movl->value &= 0xffff;
-    assignment[movk->ret()] = assignment[movl->ret()];
+    Value *dst = movl->ret();
+    Value *v;
+
+    if (val >= 0) {
+      unsigned short lo = val & 0xffff;
+      unsigned short hi = (val >> 16) & 0xffff;
+
+      auto base = builder.create<MovZOp>(i64);
+      base->value = lo;
+      assignment[base->ret()] = assignment[dst];
+      v = base->ret();
+
+      if (hi != 0) {
+        auto movk = builder.create<MovKOp>(i64);
+        movk->value = hi;
+        assignment[movk->ret()] = assignment[dst];
+        v = movk->ret();
+      }
+    } else {
+      unsigned short lo = (~val) & 0xffff;
+      unsigned short hi = (val >> 16) & 0xffff;
+
+      auto base = builder.create<MovNOp>(i64);
+      base->value = lo;
+      assignment[base->ret()] = assignment[dst];
+      v = base->ret();
+
+      if (hi != 0xffff) {
+        auto movk = builder.create<MovKOp>(i64);
+        movk->value = hi;
+        assignment[movk->ret()] = assignment[dst];
+        v = movk->ret();
+      }
+    }
+    movl->ret()->replaceAllUsesWith(v);
+    movl->erase();
     return;
   }
 }

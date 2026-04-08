@@ -60,7 +60,6 @@ void RaiseArray::raiseRecursive(FuncOp *func) {
 
   // For all calls to `func` inside the same recursive cycle, we need to increase depth by 1.
   // All of them now need a new depth argument.
-  // For calls between them, the depth argument is passed as-is.
   std::set<FuncOp*> scc = tarjan->getSccContaining(func);
   std::map<FuncOp*, Value*> depths;
   for (auto fn : scc)
@@ -71,7 +70,10 @@ void RaiseArray::raiseRecursive(FuncOp *func) {
       if (!scc.count(cast<FuncOp>(op->val(0)->def)))
         continue;
 
-      op->pushOperand(depths[fn]);
+      builder.setBefore(op);
+      auto one = builder.createInt(1)->ret();
+      auto add = builder.create<AddIOp>(i32)->with(depths[fn], one);
+      op->pushOperand(add->ret());
     }
   }
   

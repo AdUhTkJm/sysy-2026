@@ -31,6 +31,8 @@ declare_pass(HighDCE,
       }
     });
   );
+
+  walk(module, [](Op *op) { op->remove<UnerasableAttr>(); });
 }
 
 bool HighDCE::removeIfResults(IfOp *op) {

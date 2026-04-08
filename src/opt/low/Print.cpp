@@ -16,6 +16,7 @@ declare_pass(Print) {
   }
   printer.showHidden = false;
   printer.showAttr = false;
+  printer.showRange = false;
 
   std::ofstream f;
   std::ostream &os = options.outputFile == "-" || options.outputFile == ""

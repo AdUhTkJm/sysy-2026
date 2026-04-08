@@ -14,6 +14,7 @@ class Printer {
   std::ostringstream os;
   std::string bbPrefix = "bb";
   int depth = 0, bid = 0, vid = 0;
+  const Op *printing = nullptr;
 
   using Print = void (*)(std::ostream &, const Op *op, Printer *printer);
   using PrintMap = std::unordered_map<size_t, Printer::Print>;
@@ -32,6 +33,7 @@ public:
   std::string str(const Block *block);
   bool showHidden = true;
   bool showAttr = true;
+  bool showRange = true;
 
   void print(const Region *region);
   void print(const Block *block);

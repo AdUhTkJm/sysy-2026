@@ -4,6 +4,7 @@
 #include "Regs.h"
 #include "../utils/DataStructure.h"
 #include "../main/Options.h"
+#include "../opt/high/Common.h"
 #include <cstring>
 
 namespace ir {
@@ -276,6 +277,16 @@ printer(MovLOp) {
 printer(MovKOp) {
   auto movk = cast<MovKOp>(op);
   os << "movk " << printer->str(op->ret()) << ", #" << movk->value << ", lsl #16";
+}
+
+printer(MovZOp) {
+  auto movz = cast<MovZOp>(op);
+  os << "movz " << printer->str(op->ret()) << ", #" << movz->value;
+}
+
+printer(MovNOp) {
+  auto movn = cast<MovNOp>(op);
+  os << "movn " << printer->str(op->ret()) << ", #" << movn->value;
 }
 
 printer(LdrOp) {
@@ -559,6 +570,10 @@ attr_printer(IncomingStackArgAttr) {
   os << "<stackarg>";
 }
 
+attr_printer(UnreachableAttr) {
+  os << "<unreachable: " << cast<UnreachableAttr>(attr)->region << ">";
+}
+
 #define op_map_entry(Ty) { Ty::id, print##Ty },
 #define attr_map_entry(Ty) { Ty::identifier(), print##Ty },
 
@@ -587,16 +602,27 @@ int Printer::id(const Value *value) {
 
 std::string Printer::str(const Value *value) {
   auto it = idents.find(value);
+  std::stringstream ss;
   std::string name = (it == idents.end()) ? "%" + std::to_string(id(value)) : it->second;
   if (options.printType) {
-    std::stringstream ss;
     ss << "(" << name << ": ";
     printType(ss, value->type);
     ss << ")";
-    return ss.str();
+  } else
+    ss << name;
+  
+  if (showRange && printing) {
+    auto it = opt::rangeResult.find(printing);
+    if (it != opt::rangeResult.end()) {
+      data::ConstEnv env = it->second;
+      if (auto v = env.data->find(value); v != env.data->end()) {
+        data::Interval i = v->second;
+        ss << i;
+      }
+    }
   }
 
-  return name;
+  return ss.str();
 }
 
 std::string Printer::str(const Block *block) {
@@ -652,6 +678,7 @@ void Printer::print(const Region *region) {
 void Printer::print(const Op *op) {
   auto printfn = dispatch()[op->id];
   assert(printfn);
+  printing = op;
   
   std::stringstream ss("");
   printfn(ss, op, this);

@@ -12,7 +12,7 @@ namespace ir {
 #define attr_list(X) \
   X(IntAttr) X(SizeAttr) X(DimAttr) X(ArgDimAttr) \
   X(ConstIArrAttr) X(ConstFArrAttr) X(UnerasableAttr) X(RecursiveAttr) \
-  X(IncomingStackArgAttr) X(NonIdempotentAttr)
+  X(IncomingStackArgAttr) X(NonIdempotentAttr) X(UnreachableAttr)
 
 class Block;
 class Value;
@@ -120,6 +120,13 @@ class StackOffsetAttr : public AttrImpl<StackOffsetAttr> {
 public:
   int size;
   StackOffsetAttr(int i): size(i) {}
+};
+
+// The i'th region of the targeted operation is unreachable.
+class UnreachableAttr : public AttrImpl<UnreachableAttr> {
+public:
+  int region;
+  UnreachableAttr(int i): region(i) {}
 };
 
 using Attributes = std::vector<const Attr*>;
