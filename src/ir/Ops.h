@@ -19,12 +19,13 @@ public: \
   X(EqFOp) X(NeFOp) X(LtFOp) X(LeFOp) X(NotFOp) X(SextOp) \
   X(YieldOp) X(I2FOp) X(F2IOp) X(UndefOp) X(ContinueOp) X(BreakOp) \
   X(DoWhileOp) X(AddLOp) X(SubLOp) X(AddFOp) X(SubFOp) X(MulFOp) X(DivFOp) \
+  X(LShiftOp) X(RShiftOp) \
   /* ARM operations */ \
   X(AddWOp) X(AddXOp) X(MaddWOp) X(MsubWOp) \
   X(SubWOp) X(SubXOp) X(MulWOp) X(MulXOp) \
   X(DivWOp) X(DivXOp) X(CmpEqOp) X(CmpNeOp) X(CmpLtOp) X(CmpLeOp) \
   X(FaddOp) X(FsubOp) X(FmulOp) X(FdivOp) \
-  X(RetOp) X(EorWOp) X(LslWOp) X(AndWOp) X(AndXOp) X(FmovOp) \
+  X(RetOp) X(EorWOp) X(LslWOp) X(LsrWOp) X(AsrWOp) X(AndWOp) X(AndXOp) X(FmovOp) \
   X(FcmpEqOp) X(FcmpNeOp) X(FcmpLtOp) X(FcmpLeOp) X(FcvtzsOp) X(ScvtfOp) \
   X(SxtwOp)
 
@@ -49,7 +50,8 @@ public: \
   X(AddWIOp) X(AddXIOp) X(AddWLslOp) X(AddXLslOp) X(AddSxtOp) \
   X(MovIOp) X(MovLOp) X(MovKOp) X(MovZOp) X(MovNOp) \
   X(LdrOp) X(StrOp) X(LdpOp) X(StpOp) \
-  X(EorWIOp) X(LdrLslOp) X(StrLslOp) X(LslWIOp) \
+  X(EorWIOp) X(LdrLslOp) X(StrLslOp) \
+  X(LslWIOp) X(LsrWIOp) X(AsrWIOp) \
   X(SubWIOp) X(SubXIOp) X(AndWIOp) X(AndXIOp) 
 
 #define arm_mem_op_list(X) \

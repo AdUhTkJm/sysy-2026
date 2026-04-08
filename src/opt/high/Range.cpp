@@ -129,7 +129,8 @@ void Range::runOp(Op *op) {
       auto vlim = cur[lim], vr = cur[r], vstart = cur[start];
 
       inloop[l] = inloop[l].intersect({ vstart.lo, vlim.hi - 1 });
-      outloop[l] = outloop[l].intersect({ vlim.lo, vlim.hi + vr.hi - 1 });
+      auto max = long(vlim.hi - 1) + vr.hi;
+      outloop[l] = outloop[l].intersect({ vlim.lo, max > INT_MAX ? INT_MAX : int(max) });
 
       cur = inloop;
       runImpl(op->getRegion());

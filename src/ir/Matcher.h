@@ -60,8 +60,8 @@ struct Pattern {
 };
 
 struct OpAdaptor {
-  bool (*match)(Op *op, const Pattern *pattern, Env &env);
-  Op *(*build)(Builder &builder, const Pattern *pattern, const Env &env);
+  bool (*match)(Value *v, const Pattern *pattern, Env &env);
+  Value *(*build)(Builder &builder, const Pattern *pattern, const Env &env);
 };
 
 using Adaptors = std::unordered_map<std::remove_cv<decltype(Op::id)>::type, OpAdaptor>;
@@ -84,7 +84,7 @@ public:
   Rule &operator&(const Predicate &p) { pred = p; return *this; }
 
   bool match(Op *op);
-  Op *build(Builder &builder);
+  Value *build(Builder &builder);
   Op *rewrite(Op *op);
   void where(const Predicate &p) { pred = p; }
 };

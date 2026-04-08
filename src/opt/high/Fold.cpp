@@ -16,25 +16,26 @@ static Rule rules[] = {
   Rule("(addi (addi x (int 'a)) (int 'b))") >> "(addi:i32 x (int:i32 (!add 'a 'b)))",
   Rule("(addi (addi x y) (subi z y))") >> "(addi:i32 x z)",
   Rule("(addi (addi x (int 'a)) y)") >> "(addi:i32 (addi:i32 x y) (int:i32 'a))",
-  Rule("(addi (subi 'a x) y)") >> "(subi:i32 y x)",
+  Rule("(addi (subi (int 'a) x) y)") >> "(subi:i32 y x)" when zero,
 
   Rule("(addl x (int64 'a))") >> "x" when zero,
   Rule("(addl (int64 'a) (int64 'b))") >> "(int64:i64 (!add 'a 'b))",
   Rule("(addl (addl x (int64 'a)) (int64 'b))") >> "(addl:i64 x (int64:i64 (!add 'a 'b)))",
 
   Rule("(subi (int 'a) (int 'b))") >> "(int:i32 (!sub 'a 'b))",
+  Rule("(subi x x)") >> "(int:i32 0)",
   Rule("(subi x (int 'a))") >> "x" when zero,
   Rule("(subi (int 'a) (subi x y))") >> "(subi:i32 y x)" when zero,
+  Rule("(subi (subi (int 'a) x) y)") >> "(subi:i32 (int:i32 'a) (addi:i32 x y))",
   Rule("(subi (subi x y) x)") >> "(subi:i32 (int:i32 0) y)",
-  Rule("(subi (subi x y) y)") >> "(subi:i32 (int:i32 0) x)",
-  Rule("(subi (subi (int 'a) x) (int 'b))") >> "(subi:i32 (!sub 'a 'b) x)",
-  Rule("(subi x (int64 'a))") >> "x" when zero,
-  Rule("(subi (addi x y) (addi x z))") >> "(subi:i32 y z)",
+  Rule("(subi (subi (int 'a) x) (int 'b))") >> "(subi:i32 (int:i32 (!sub 'a 'b)) x)",
   Rule("(subi (addi y x) (addi z x))") >> "(subi:i32 y z)",
+  Rule("(subi (addi x y) (addi x z))") >> "(subi:i32 y z)",
   Rule("(subi x (addi x y))") >> "(subi:i32 (int:i32 0) y)",
   Rule("(subi x (addi y x))") >> "(subi:i32 (int:i32 0) y)",
   Rule("(subi (addi x y) x)") >> "y",
-  Rule("(subi (addi (subi x z) y) (addi x y))") >> "z",
+  Rule("(subi (addi x y) y)") >> "x",
+  Rule("(subi (addi (subi x z) y) (addi x y))") >> "(subi:i32 (int:i32 0) z)",
 
   Rule("(subl (int64 'a) (int64 'b))") >> "(int64:i64 (!sub 'a 'b))",
   Rule("(subl x (int64 'a))") >> "x" when zero,
@@ -47,6 +48,8 @@ static Rule rules[] = {
   Rule("(sext (int 'a))") >> "(int64:i64 'a)",
   
   Rule("(muli (int 'a) (int 'b))") >> "(int:i32 (!mul 'a 'b))",
+  Rule("(muli x (int 'a))") >> "x" when { return imm("'a") == 1; },
+
   Rule("(divi (int 'a) (int 'b))") >> "(int:i32 (!div 'a 'b))",
   Rule("(modi (int 'a) (int 'b))") >> "(int:i32 (!mod 'a 'b))",
   

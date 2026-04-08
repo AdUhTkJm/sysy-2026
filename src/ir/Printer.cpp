@@ -162,6 +162,8 @@ format(ModIOp, "$r0 = $x0 % $x1");
 format(AndIOp, "$r0 = $x0 & $x1");
 format(OrIOp , "$r0 = $x0 | $x1");
 format(XorIOp, "$r0 = $x0 ^ $x1");
+format(LShiftOp, "$r0 = $x0 << $x1");
+format(RShiftOp, "$r0 = $x0 >> $x1");
 format(EqOp, "$r0 = $x0 == $x1");
 format(NeOp, "$r0 = $x0 != $x1");
 format(LtOp, "$r0 = $x0 < $x1");
@@ -210,6 +212,8 @@ format(DivXOp, "sdiv $R0, $X0, $X1");
 format(FdivOp, "fdiv $r0, $x0, $x1");
 format(EorWOp, "eor $r0, $x0, $x1");
 format(LslWOp, "lsl $r0, $x0, $x1");
+format(LsrWOp, "lsr $r0, $x0, $x1");
+format(AsrWOp, "asr $r0, $x0, $x1");
 format(SxtwOp, "sxtw $r0, $x0");
 format(CmpEqOp, "cmp $x0, $x1\ncset $r0, eq");
 format(CmpNeOp, "cmp $x0, $x1\ncset $r0, ne");
@@ -245,6 +249,8 @@ iprinter(SubWIOp, sub)
 iprinter(SubXIOp, sub)
 iprinter(EorWIOp, eor)
 iprinter(LslWIOp, lsl)
+iprinter(AsrWIOp, asr)
+iprinter(LsrWIOp, lsr)
 
 printer(AddWLslOp) {
   auto x = cast<AddWLslOp>(op);

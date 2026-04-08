@@ -176,18 +176,18 @@ Pattern::Pattern(OpKind kind): kind(Op), op(kind) {
 Pattern::Pattern(ActionKind kind): kind(Action), act(kind) {
 }
 
-bool matchVar(Op *op, const Pattern *pattern, Env &env) {
-  if (!op || op->getNumResults() != 1)
+bool matchVar(Value *v, const Pattern *pattern, Env &env) {
+  if (!v)
     return false;
 
   // We must record the operation's type regardless of pattern kind.
   if (strlen(pattern->tyname) != 0) {
     if (auto it = env.types.find(pattern->tyname); it != env.types.end()) {
-      if (it->second != op->ret()->type)
+      if (it->second != v->type)
         return false;
     }
 
-    env.types[pattern->tyname] = op->ret()->type;
+    env.types[pattern->tyname] = v->type;
   }
 
   // Then only deal with variables.
@@ -195,30 +195,30 @@ bool matchVar(Op *op, const Pattern *pattern, Env &env) {
     return false;
   
   if (auto it = env.vals.find(pattern->name); it != env.vals.end()) {
-    if (it->second->def != op)
+    if (it->second != v)
       return false;
-  }
-
-  env.vals[pattern->name] = op->ret();
+  } else
+    env.vals[pattern->name] = v;
+  
   return true;
 }
 
-Op *buildVar(Builder &, const Pattern *pattern, const Env &env) {
+Value *buildVar(Builder &, const Pattern *pattern, const Env &env) {
   if (pattern->kind == Pattern::Var)
-    return env.vals.at(pattern->name)->def;
+    return env.vals.at(pattern->name);
 
   return nullptr;
 }
 
-static bool match(Op *op, const Pattern *pattern, Env &env) {
-  auto it = adaptors.find(op->id);
+static bool match(Value *v, const Pattern *pattern, Env &env) {
+  auto it = adaptors.find(v->def->id);
   if (it == adaptors.end())
-    return matchVar(op, pattern, env);
+    return matchVar(v, pattern, env);
 
-  return it->second.match(op, pattern, env);
+  return it->second.match(v, pattern, env);
 }
 
-static Op *build(Builder &builder, const Pattern *pattern, const Env &env) {
+static Value *build(Builder &builder, const Pattern *pattern, const Env &env) {
   auto it = adaptors.find((int) pattern->op);
   if (it == adaptors.end())
     return buildVar(builder, pattern, env);
@@ -227,13 +227,14 @@ static Op *build(Builder &builder, const Pattern *pattern, const Env &env) {
 }
 
 template<class T>
-bool matchEmptyImpl(Op *op, const Pattern *pattern, Env &env) {
-  if (!op || op->getNumResults() > 1 || pattern->kind == Pattern::Imm)
+bool matchEmptyImpl(Value *v, const Pattern *pattern, Env &env) {
+  if (pattern->kind == Pattern::Imm)
     return false;
 
-  if (matchVar(op, pattern, env))
+  if (matchVar(v, pattern, env))
     return true;
 
+  auto op = v->def;
   if (op->getNumOperands() > 3)
     return false;
 
@@ -241,16 +242,16 @@ bool matchEmptyImpl(Op *op, const Pattern *pattern, Env &env) {
     return false;
 
   for (auto [i, pat] : data::enumerate(pattern->children)) {
-    if (pat && !match(op->val(i)->def, pat, env))
+    if (pat && !match(op->val(i), pat, env))
       return false;
   }
   return true;
 }
 
 template<class T>
-Op *buildEmptyImpl(Builder &builder, const Pattern *pattern, const Env &env) {
+Value *buildEmptyImpl(Builder &builder, const Pattern *pattern, const Env &env) {
   if (pattern->kind == Pattern::Var)
-    return env.vals.at(pattern->name)->def;
+    return env.vals.at(pattern->name);
 
   assert(pattern->kind != Pattern::Imm);
   Value *operands[3];
@@ -260,7 +261,7 @@ Op *buildEmptyImpl(Builder &builder, const Pattern *pattern, const Env &env) {
     if (!ch)
       break;
 
-    operands[i] = build(builder, ch, env)->ret();
+    operands[i] = build(builder, ch, env);
   }
 
   Op *op;
@@ -273,12 +274,12 @@ Op *buildEmptyImpl(Builder &builder, const Pattern *pattern, const Env &env) {
 
   for (int j = 0; j < i; j++)
     op->pushOperand(operands[j]);
-  return op;
+  return op->ret();
 }
 
 template<class T>
-bool matchImmImpl(Op *op, const Pattern *pattern, Env &env) {
-  if (matchVar(op, pattern, env))
+bool matchImmImpl(Value *v, const Pattern *pattern, Env &env) {
+  if (matchVar(v, pattern, env))
     return true;
 
   Pattern pat(*pattern);
@@ -291,9 +292,10 @@ bool matchImmImpl(Op *op, const Pattern *pattern, Env &env) {
   if (last->kind != Pattern::Imm)
     return false;
   
+  auto op = v->def;
   env.imms[last->name] = cast<T>(op)->value;
   last = nullptr;
-  return matchEmptyImpl<T>(op, &pat, env);
+  return matchEmptyImpl<T>(v, &pat, env);
 }
 
 #define binact(Ty, op) \
@@ -317,7 +319,7 @@ int evaluate(const Pattern *pattern, const Env &env) {
 }
 
 template<class T>
-Op *buildImmImpl(Builder &builder, const Pattern *pattern, const Env &env) {
+Value *buildImmImpl(Builder &builder, const Pattern *pattern, const Env &env) {
   Pattern pat(*pattern);
 
   auto size = pat.size();
@@ -325,10 +327,10 @@ Op *buildImmImpl(Builder &builder, const Pattern *pattern, const Env &env) {
   auto value = evaluate(last, env);
   last = nullptr;
 
-  auto op = buildEmptyImpl<T>(builder, &pat, env);
+  auto op = buildEmptyImpl<T>(builder, &pat, env)->def;
   cast<T>(op)->value = value;
 
-  return op;
+  return op->ret();
 }
 
 #define adaptor_decl(Ty, infix) { (decltype(Op::id)) OpKind::Ty, OpAdaptor { match##infix##Impl<Ty>, build##infix##Impl<Ty> } },
@@ -341,7 +343,7 @@ Adaptors adaptors {
   adaptor_decl(Int64Op, Imm)
 };
 
-Op *Rule::build(Builder &builder) {
+Value *Rule::build(Builder &builder) {
   if (!building || (pred && !(*pred)(env)))
     return nullptr;
 
@@ -349,7 +351,10 @@ Op *Rule::build(Builder &builder) {
 }
 
 bool Rule::match(Op *op) {
-  return ::match(op, matching, env);
+  if (!op || op->getNumResults() != 1)
+    return false;
+
+  return ::match(op->ret(), matching, env);
 }
 
 Op *Rule::rewrite(Op *op) {
@@ -364,9 +369,9 @@ Op *Rule::rewrite(Op *op) {
     return nullptr;
   
   if (op->getNumResults() > 0)
-    op->ret()->replaceAllUsesWith(after->ret());
+    op->ret()->replaceAllUsesWith(after);
   op->erase();
-  return after;
+  return after->def;
 }
 
 }

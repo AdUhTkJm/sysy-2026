@@ -76,6 +76,7 @@ struct ConstEnv {
 
   Interval operator[](const ir::Value *v) const { return data->at(v); }
   Interval at(const ir::Value *v) const { return data->at(v); }
+  int count(const ir::Value *v) const { return data->count(v); }
 
   ConstEnv(Env x): data(x.data) {}
   ConstEnv(const ConstEnv &other): data(other.data) {}

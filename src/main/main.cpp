@@ -45,6 +45,8 @@ void populate(opt::PassManager &pm) {
   }
   add_pass(HighDCE);
   add_pass(Range);
+  add_pass(RangedFold);
+  add_pass(HighDCE);
 
   // Mid-IR passes.
   add_pass(Flatten);

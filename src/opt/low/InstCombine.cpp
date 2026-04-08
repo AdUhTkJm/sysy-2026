@@ -14,13 +14,20 @@ static Rule rules[] = {
   Rule("(addw (movi 'a) (movi 'b))") >> "(movi:i32 (!add 'a 'b))",
   Rule("(addw x (movi 'a))") >> "(addwi:i32 x 'a)" when { return imm("'a") < 4096 && imm("'a") >= 0; },
   Rule("(addx x (movl 'a))") >> "(addxi:i64 x 'a)" when { return imm("'a") < 4096 && imm("'a") >= 0; },
+
   Rule("(subw (movi 'a) (movi 'b))") >> "(movi:i32 (!sub 'a 'b))",
   Rule("(subw x (movi 'a))") >> "(subwi:i32 x 'a)" when { return imm("'a") < 4096 && imm("'a") >= 0; },
   Rule("(subx x (movl 'a))") >> "(subxi:i64 x 'a)" when { return imm("'a") < 4096 && imm("'a") >= 0; },
+
   Rule("(mulw x (movi 'a))") >> "x" when { return imm("'a") == 1; },
   Rule("(mulw (movi 'a) (movi 'b))") >> "(movi:i32 (!mul 'a 'b))",
+
+  Rule("(lslw x (movi 'a))") >> "(lslwi:i32 x 'a)",
+  Rule("(lsrw x (movi 'a))") >> "(lsrwi:i32 x 'a)",
+
   Rule("(addwi x 'a)") >> "x" when { return imm("'a") == 0; },
   Rule("(addxi x 'a)") >> "x" when { return imm("'a") == 0; },
+
   Rule("(str (addxi base 'a) val 'b)") >> "(str base val (!add 'a 'b))",
   Rule("(ldr:T (addxi base 'a) 'b)") >> "(ldr:T base (!add 'a 'b))",
 };
