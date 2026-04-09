@@ -27,10 +27,13 @@ public: \
   X(FaddOp) X(FsubOp) X(FmulOp) X(FdivOp) \
   X(RetOp) X(EorWOp) X(LslWOp) X(LsrWOp) X(AsrWOp) X(AndWOp) X(AndXOp) X(FmovOp) \
   X(FcmpEqOp) X(FcmpNeOp) X(FcmpLtOp) X(FcmpLeOp) X(FcvtzsOp) X(ScvtfOp) \
-  X(SxtwOp)
+  X(SxtwOp) X(SmullOp) \
+  /* Auxiliary operations */ \
+  X(CastOp) /* Casts between types; emits to nothing */ \
+  X(UnreachableOp)
 
 #define terminator_list(X) \
-  X(ReturnOp) X(BreakOp) X(ContinueOp) X(YieldOp)
+  X(ReturnOp) X(BreakOp) X(ContinueOp) X(YieldOp) X(UnreachableOp)
 
 #define arm_branch_op_list(X) \
   X(BeqOp) X(BneOp) X(BltOp) X(BleOp) X(CbzOp) X(CbnzOp) X(BgeOp) X(BgtOp)
@@ -47,12 +50,13 @@ public: \
   X(JumpOp)
 
 #define arm_imm_op_list(X) \
-  X(AddWIOp) X(AddXIOp) X(AddWLslOp) X(AddXLslOp) X(AddSxtOp) \
+  X(AddWIOp) X(AddXIOp) X(AddWLslOp) X(AddWLsrOp) X(AddXLslOp) X(AddSxtOp) \
   X(MovIOp) X(MovLOp) X(MovKOp) X(MovZOp) X(MovNOp) \
   X(LdrOp) X(StrOp) X(LdpOp) X(StpOp) \
   X(EorWIOp) X(LdrLslOp) X(StrLslOp) \
-  X(LslWIOp) X(LsrWIOp) X(AsrWIOp) \
-  X(SubWIOp) X(SubXIOp) X(AndWIOp) X(AndXIOp) 
+  X(LslWIOp) X(LsrWIOp) X(AsrWIOp) X(AsrXIOp) \
+  X(SubWIOp) X(SubXIOp) X(AndWIOp) X(AndXIOp) \
+  X(CselLtIOp)
 
 #define arm_mem_op_list(X) \
   X(LdrOp) X(StrOp) X(LdpOp) X(StpOp)

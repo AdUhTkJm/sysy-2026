@@ -81,8 +81,7 @@ bool Inline::inlinable(FuncOp *op) {
     return inlinableCache[op] = false;
 
   // The function should only contain a single return at the end.
-  // In fact, a single return already implies that it has to be at the end.
-  if (collectOps<ReturnOp>(op).size() != 1)
+  if (collectOps<ReturnOp>(op).size() != 1 || !isa<ReturnOp>(op->getRegion()->getLastOp()))
     return inlinableCache[op] = false;
 
   // Too large.

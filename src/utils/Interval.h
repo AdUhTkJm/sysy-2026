@@ -19,11 +19,19 @@ struct Interval {
 
   static Interval top() { return { INT_MIN, INT_MAX }; }
   Interval(): lo(INT_MIN), hi(INT_MAX) {}
-  Interval(int lo, int hi): lo(lo), hi(hi) {}
+  Interval(int lo, int hi): lo(lo), hi(hi) {
+    if (lo > hi)
+      *this = empty;
+  }
   Interval(int c): lo(c), hi(c) {}
+
+  const static Interval empty;
 
   bool operator==(Interval other) const {
     return lo == other.lo && hi == other.hi;
+  }
+  bool operator!=(Interval other) const {
+    return !(*this == other);
   }
 
   Interval join(Interval other) const {
@@ -40,7 +48,15 @@ struct Interval {
     };
   }
 
+  Interval widen(Interval other) const {
+    return {
+      other.lo < lo ? INT_MIN : lo,
+      other.hi > hi ? INT_MAX : hi
+    };
+  }
 };
+
+inline const Interval Interval::empty { 0, -1 };
 
 Interval operator+(Interval a, Interval b);
 Interval operator-(Interval a, Interval b);

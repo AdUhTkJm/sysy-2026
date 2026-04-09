@@ -1,4 +1,5 @@
 #include "Common.h"
+#include <cstring>
 
 namespace opt {
 
@@ -23,8 +24,45 @@ declare_pass(Range,
   }
   rangeResult.clear();
 
-  for (auto func : collectFunctions())
+  auto funcs = collectFunctions();
+  std::unordered_map<FuncOp*, std::vector<data::Interval>> ranges;
+  for (auto func : funcs) {
+    auto &vec = ranges[func];
+    vec.resize(func->getNumResults() - 1);
+    for (auto &x : vec)
+      x = data::Interval::empty;
+  }
+  for (auto func : funcs)
     runImpl(func->getRegion());
+
+  fixed(
+  // Now consider cross-function ranges.
+  for_all(CallOp) {
+    auto fn = cast<FuncOp>(op->val()->def);
+    for (unsigned i = 1; i < op->getNumOperands(); i++) {
+      auto it = envs.find(op);
+      if (it == envs.end())
+        continue;
+
+      auto old = ranges[fn][i - 1];
+      // Apply widening to avoid infinite (or too long) loops.
+      auto joined = __index > 3
+        ? old.widen((it->second)[op->val(i)])
+        : old.join ((it->second)[op->val(i)]);
+
+      if (old != joined) {
+        mark_changed;
+        ranges[fn][i - 1] = joined;
+      }
+    }
+  }
+  for (auto func : funcs) {
+    cur = data::Env();
+    for (unsigned i = 1; i < func->getNumResults(); i++)
+      cur[func->ret(i)] = ranges[func][i - 1];
+    runImpl(func->getRegion());
+  }
+  )
 
   for (auto [k, v] : envs)
     rangeResult.emplace(k, v);
@@ -102,6 +140,7 @@ void Range::runOp(Op *op) {
     auto region = op->getRegion();
     auto last = cast<ConditionOp>(region->getLastOp());
     auto cond = last->val()->def;
+    auto inloop = cur.clone(), outloop = cur.clone();
     if (isa<LtOp>(cond)) {
       // We suppose that the loop condition is `i + a < n`,
       // where `i` is the induction variable.
@@ -110,13 +149,13 @@ void Range::runOp(Op *op) {
       // We have to check our assumption.
       auto index = cond->getOperandIndex(ind);
       if (index == cond->getNumOperands() || !isa<AddIOp>(ind->def))
-        goto fail;
+        goto next;
 
       auto l = ind->def->val(0), r = ind->def->val(1);
       auto loopvarIndex = op->getResultIndex(l);
       if (loopvarIndex == op->getNumResults()) {
         if ((loopvarIndex = op->getResultIndex(r)) == op->getNumResults())
-          goto fail;
+          goto next;
         std::swap(l, r);
       }
 
@@ -125,22 +164,38 @@ void Range::runOp(Op *op) {
       // Now `l` is the induction variable.
       // It must be no less than `start` and less than `lim` inside the loop,
       // and be in [lim, lim + r) outside the loop.
-      auto inloop = cur.clone(), outloop = cur.clone();
       auto vlim = cur[lim], vr = cur[r], vstart = cur[start];
 
       inloop[l] = inloop[l].intersect({ vstart.lo, vlim.hi - 1 });
       auto max = long(vlim.hi - 1) + vr.hi;
       outloop[l] = outloop[l].intersect({ vlim.lo, max > INT_MAX ? INT_MAX : int(max) });
-
-      cur = inloop;
-      runImpl(op->getRegion());
-      cur = outloop;
-      return;
     }
 
-    fail:
-    // Make no further assumptions.
+    // Look at induction variables.
+    next:
+    for (unsigned i = 1; i < last->getNumOperands(); i++) {
+      auto upd = last->val(i)->def;
+      auto ind = op->ret(i - 1);
+
+      // If this is monotonically increasing, then we know the lower bound.
+      if (isa<AddIOp>(upd)) {
+        auto l = upd->val(0), r = upd->val(1);
+        if (r == ind)
+          std::swap(l, r);
+
+        auto vr = cur[r];
+        if (vr.lo >= 0) {
+          auto start = cur[op->val(i - 1)];
+          inloop[l] = inloop[l].intersect({ start.lo, INT_MAX });
+          outloop[l] = outloop[l].intersect({ start.lo, INT_MAX });
+        }
+      }
+    }
+
+    cur = inloop;
     runImpl(op->getRegion());
+    cur = outloop;
+    return;
   }
 }
 

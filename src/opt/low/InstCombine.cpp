@@ -1,5 +1,6 @@
 #include "Common.h"
 #include "../../ir/Matcher.h"
+#include <cmath>
 
 using namespace match;
 
@@ -37,6 +38,7 @@ declare_local_pass(InstCombine,
   bool rewrite(Op *op) const;
 
   bool rewriteMul(Op *op, Value *v, int mul) const;
+  bool rewriteDiv(Op *op, Value *v, int mul) const;
 ) {
   fixed(walk<Postorder>(func, [&](Op *op) {
     for (auto &rule : rules) {
@@ -95,6 +97,14 @@ bool InstCombine::rewrite(Op *op) const {
       return rewriteMul(op, lhs, mov->value);
     else if (auto mov = dyn_cast<MovIOp>(lhs->def))
       return rewriteMul(op, rhs, mov->value);
+
+    return false;
+  }
+
+  if (isa<DivWOp>(op)) {
+    auto lhs = op->val(0), rhs = op->val(1);
+    if (auto mov = dyn_cast<MovIOp>(rhs->def))
+      return rewriteDiv(op, lhs, mov->value);
 
     return false;
   }
@@ -182,6 +192,102 @@ bool InstCombine::rewriteMul(Op *op, Value *v, int mul) const {
       op->ret()->replaceAllUsesWith(add->ret());
       op->erase();
     }
+    return true;
+  }
+
+  return false;
+}
+
+struct Multiplier {
+  int shPost;
+  unsigned long mHigh;
+  int l;
+};
+
+[[gnu::unused]] static Multiplier chooseMultiplier(int d) {
+  constexpr int N = 32;
+  // Number of bits of precision needed. Note we only need 31 bits,
+  // because there's a sign bit.
+  constexpr int prec = N - 1;
+  
+  int l = std::ceil(std::log2((double) d));
+  int shPost = l;
+  unsigned long mLow = (1ull << (N + l)) / d;
+  unsigned long mHigh = ((1ull << (N + l)) + (1ull << (N + l - prec))) / d;
+  while (mLow / 2 < mHigh / 2 && shPost > 0) {
+    mLow /= 2;
+    mHigh /= 2;
+    shPost--;
+  }
+  return { shPost, mHigh, l };
+}
+
+bool InstCombine::rewriteDiv(Op *op, Value *v, int div) const {
+  if (div == 1) {
+    op->ret()->replaceAllUsesWith(v);
+    op->erase();
+    return true;
+  }
+
+  if (div <= 0)
+    return false;
+
+  Builder builder;
+  if (div == 2) {
+    builder.setBefore(op);
+
+    // add     w8, w0, w0, lsr #31
+    // asr     w0, w8, #1
+    auto add = builder.create<AddWLsrOp>(i32)->with(v, v);
+    add->value = 31;
+    auto asr = builder.replace<AsrWIOp>(op, i32)->with(add->ret());
+    asr->value = 1;
+    return true;
+  }
+
+  if (__builtin_popcount(div) == 1) {
+    builder.setBefore(op);
+
+    // add     w8, w0, #(2^n - 1)
+    // cmp     w0, #0
+    // csel    w8, w8, w0, lt
+    // asr     w0, w8, #n
+    auto vi = builder.create<MovIOp>(i32);
+    vi->value = div - 1;
+    
+    auto add = builder.create<AddWOp>(i32)->with(v, vi->ret());
+    auto csel = builder.create<CselLtIOp>(i32)->with(v, add->ret(), v);
+    csel->value = 0;
+    
+    auto asr = builder.replace<AsrWIOp>(op, i32)->with(csel->ret());
+    asr->value = __builtin_ctz(div);
+    return true;
+  }
+
+  auto [shPost, m, l] = chooseMultiplier(div);
+  builder.setBefore(op);
+  if (m < (1ull << 31)) {
+    auto mVal = builder.create<MovIOp>(i32); mVal->value = m;
+    auto mulsh = builder.create<SmullOp>(i64)->with(v, mVal->ret());
+    auto sra = builder.create<AsrXIOp>(i64)->with(mulsh->ret()); sra->value = 32 + shPost;
+    auto cast = builder.create<CastOp>(i32)->with(sra->ret());
+    auto add = builder.replace<AddWLsrOp>(op, i32)->with(cast->ret(), cast->ret()); add->value = 31;
+    return true;
+  } else {
+    auto mVal = builder.create<MovIOp>(i32); mVal->value = m - (1ull << 32);
+    auto mul = builder.create<SmullOp>(i64)->with(mVal->ret(), v);
+    auto mulsh = builder.create<AsrXIOp>(i64)->with(mul->ret()); mulsh->value = 32;
+    auto cast = builder.create<CastOp>(i32)->with(mulsh->ret());
+    auto add = builder.create<AddWOp>(i32)->with(cast->ret(), v);
+    Op *sra = add;
+    if (shPost > 0) {
+      auto asr = builder.create<AsrWIOp>(i32)->with(add->ret());
+      asr->value = shPost;
+      sra = asr;
+    }
+
+    auto xsign = builder.create<AsrWIOp>(i32)->with(v); xsign->value = 31;
+    builder.replace<SubWOp>(op, i32)->with(sra->ret(), xsign->ret());
     return true;
   }
 

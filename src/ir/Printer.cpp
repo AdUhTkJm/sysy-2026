@@ -193,6 +193,7 @@ format(ContinueOp, "continue");
 format(BreakOp, "break");
 format(SextOp, "$r0 = sext $x0");
 format(CondMarkerOp, "<condition begin>");
+format(UnreachableOp, "brk #0");
 /* ARM operations */
 format(AddWOp, "add $r0, $x0, $x1");
 format(AddXOp, "add $R0, $X0, $X1");
@@ -215,6 +216,7 @@ format(LslWOp, "lsl $r0, $x0, $x1");
 format(LsrWOp, "lsr $r0, $x0, $x1");
 format(AsrWOp, "asr $r0, $x0, $x1");
 format(SxtwOp, "sxtw $r0, $x0");
+format(SmullOp, "smull $r0, $x0, $x1");
 format(CmpEqOp, "cmp $x0, $x1\ncset $r0, eq");
 format(CmpNeOp, "cmp $x0, $x1\ncset $r0, ne");
 format(CmpLtOp, "cmp $x0, $x1\ncset $r0, lt");
@@ -251,6 +253,7 @@ iprinter(EorWIOp, eor)
 iprinter(LslWIOp, lsl)
 iprinter(AsrWIOp, asr)
 iprinter(LsrWIOp, lsr)
+iprinter(AsrXIOp, asr)
 
 printer(AddWLslOp) {
   auto x = cast<AddWLslOp>(op);
@@ -262,6 +265,12 @@ printer(AddXLslOp) {
   auto x = cast<AddXLslOp>(op);
   os << "add " << printer->str(op->ret()) << ", ";
   os << printer->str(op->val(0)) << ", " << printer->str(op->val(1)) << ", lsl #" << x->value;
+}
+
+printer(AddWLsrOp) {
+  auto x = cast<AddWLsrOp>(op);
+  os << "add " << printer->str(op->ret()) << ", ";
+  os << printer->str(op->val(0)) << ", " << printer->str(op->val(1)) << ", lsr #" << x->value;
 }
 
 printer(AddSxtOp) {
@@ -364,6 +373,13 @@ printer(BlOp) {
   if (auto r = op->getNumResults(); r > 0) {
     os << " [" << r << " results]";
   }
+}
+
+printer(CselLtIOp) {
+  auto csel = cast<CselLtIOp>(op);
+  os << "cmp " << printer->str(op->val()) << ", #" << csel->value;
+  printer->printNewline(os);
+  os << "csel " << printer->str(op->ret()) << ", " << printer->str(op->val(1)) << ", " << printer->str(op->val(2)) << ", lt";
 }
 
 #define arm_branch_printer(Ty) \
@@ -510,6 +526,17 @@ printer(ReadRegOp) {
   if (retreg == name && !printer->showHidden)
     return;
   os << opname << retreg << ", " << name;
+}
+
+printer(CastOp) {
+  auto retreg = printer->str(op->ret()), fromreg = printer->str(op->val());
+  if (!printer->showHidden) {
+    auto r = retreg; r[0] = 'x';
+    auto f = fromreg; f[0] = 'x';
+    if (r == f)
+      return;
+  }
+  os << "mov " << retreg << ", " << fromreg;
 }
 
 attr_printer(IntAttr) {

@@ -110,6 +110,8 @@ std::ostream& operator<<(std::ostream &os, Interval i) {
     return os << "[⊤]";
   if (i.hi == i.lo)
     return os << "[" << i.hi << "]";
+  if (i.hi < i.lo)
+    return os << "[∅]";
   return os << "[" << i.lo << ", " << i.hi << "]";
 }
 

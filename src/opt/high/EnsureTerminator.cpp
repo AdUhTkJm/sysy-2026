@@ -60,11 +60,13 @@ declare_pass(EnsureTerminator,
     loop_with(BreakOp, removeBreak);
     loop_with(ContinueOp, removeContinue);
   } while (!(terminator_container_list(container_empty) true));
-
+  module->dump();
+  
   fixed(
     loop_and_mark_changed(IfOp, canonicalizeReturn);
     loop_and_mark_changed(DoWhileOp, canonicalizeReturn);
   );
+  
   loop_with(IfOp, removeRedundant);
   loop_with(DoWhileOp, removeRedundant);
 
@@ -90,11 +92,11 @@ void EnsureTerminator::removeRedundant(Op *op) {
     auto bb = r->getFirstBlock();
     for (it = bb->begin(); it != bb->end(); it++) {
       auto x = *it;
-      if (isa<ReturnOp>(x) || isa<YieldOp>(x) || isa<ConditionOp>(x))
+      if (isTerminator(x) || isa<ConditionOp>(x))
         break;
     }
-    if (it != bb->end())
-      it++;
+    assert(it != bb->end());
+    it++;
     while (it != bb->end()) {
       auto next = it; next++;
       erase(*it);
@@ -144,26 +146,30 @@ void EnsureTerminator::removeContinue(ContinueOp *op) {
     auto last = other->getLastOp();
     Builder builder;
 
-    // These operantions terminate the other branch as well.
+    // These operations terminate the other branch as well.
     // So the instructions afterwards will never be executed.
     // We remove them.
-    if (auto cont = dyn_cast<ContinueOp>(last)) {
-      for (auto x = parent->nextOp(); x && !isa<CondMarkerOp>(x);) {
+    if (isa<ContinueOp>(last) || isa<ReturnOp>(last) || isa<BreakOp>(last)) {
+      for (auto x = parent->nextOp(); x && !isa<CondMarkerOp>(x) && !isTerminator(x);) {
         auto next = x->nextOp();
         x->clearOperands();
         x = next;
       }
-      for (auto x = parent->nextOp(); x && !isa<CondMarkerOp>(x);) {
+      for (auto x = parent->nextOp(); x && !isa<CondMarkerOp>(x) && !isTerminator(x);) {
         auto next = x->nextOp();
         erase(x);
         x = next;
       }
 
       // Now both continues become normal yields.
-      container_name(ContinueOp).erase(cont);
+      {
+        auto op = last;
+        container_list(erase_from);
+      }
       container_name(ContinueOp).erase(op);
 
-      builder.replace<YieldOp>(last);
+      if (isa<ContinueOp>(last))
+        builder.replace<YieldOp>(last);
       builder.replace<YieldOp>(op);
       return;
     }

@@ -7,7 +7,8 @@ declare_local_pass(Flatten,
   void flattenIf(Op *op);
   void flattenDoWhile(Op *op);
 ) {
-  fixed(for (auto bb : *func->getRegion()) {
+  auto region = func->getRegion();
+  fixed(for (auto bb : *region) {
     for (auto op : *bb) {
       if (isa<IfOp>(op)) {
         flattenIf(op); mark_changed;
@@ -20,6 +21,14 @@ declare_local_pass(Flatten,
       }
     }
   });
+
+  Builder builder;
+  for (auto bb : *region) {
+    if (bb->getNumOps() == 0) {
+      builder.setToStart(bb);
+      builder.create<UnreachableOp>();
+    }
+  }
 }
 
 void Flatten::flatten(Op *op) {

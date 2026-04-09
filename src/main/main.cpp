@@ -18,6 +18,7 @@ Options options;
 void populate(opt::PassManager &pm) {
   // High-IR passes.
   add_pass(TidyCodeGen);
+  add_pass(TCO);
   add_pass(EnsureTerminator);
   add_pass(Mem2Reg);
   add_pass(HighDCE);
