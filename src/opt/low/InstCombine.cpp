@@ -77,6 +77,10 @@ void InstCombine::combineBranch(Op *op) const {
     replace(CmpNeOp, BneOp);
     replace(CmpLtOp, BltOp);
     replace(CmpLeOp, BleOp);
+    replace(FcmpEqOp, BeqFOp);
+    replace(FcmpNeOp, BneFOp);
+    replace(FcmpLtOp, BltFOp);
+    replace(FcmpLeOp, BleFOp);
     return;
   }
 
@@ -84,7 +88,11 @@ void InstCombine::combineBranch(Op *op) const {
     replace(CmpEqOp, BneOp);
     replace(CmpNeOp, BeqOp);
     replace(CmpLtOp, BgeOp);
-    replace(CmpLeOp, BltOp);
+    replace(CmpLeOp, BgtOp);
+    replace(FcmpEqOp, BneFOp);
+    replace(FcmpNeOp, BeqFOp);
+    replace(FcmpLtOp, BgeFOp);
+    replace(FcmpLeOp, BgtFOp);
     return;
   }
 }

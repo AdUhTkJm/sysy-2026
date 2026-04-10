@@ -28,11 +28,11 @@ static std::optional<int> safe_mul(int a, int b) {
 Interval operator+(Interval a, Interval b) {
   auto c = safe_add(a.lo, b.lo);
   if (!c)
-    return Interval();
+    c = INT_MIN;
 
   auto d = safe_add(a.hi, b.hi);
   if (!d)
-    return Interval();
+    d = INT_MAX;
 
   return Interval(*c, *d);
 }
@@ -40,11 +40,11 @@ Interval operator+(Interval a, Interval b) {
 Interval operator-(Interval a, Interval b) {
   auto c = safe_sub(a.lo, b.hi);
   if (!c)
-    return Interval();
+    c = INT_MIN;
 
   auto d = safe_sub(a.hi, b.lo);
   if (!d)
-    return Interval();
+    d = INT_MAX;
 
   return Interval(*c, *d);
 }
@@ -112,6 +112,8 @@ std::ostream& operator<<(std::ostream &os, Interval i) {
     return os << "[" << i.hi << "]";
   if (i.hi < i.lo)
     return os << "[∅]";
+  if (i.hi == INT_MAX)
+    return os << "[" << i.lo << ", +]";
   return os << "[" << i.lo << ", " << i.hi << "]";
 }
 

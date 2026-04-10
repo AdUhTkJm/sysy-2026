@@ -23,6 +23,25 @@ void spill(Value *v, Region *region, int i) {
   assignment[v] = (Reg) (unsigned long) alloca;
 }
 
+[[gnu::unused]] void dumpInterf(Region *region, const std::unordered_map<Value*, std::set<Value*>> &interf) {
+  std::cerr << region;
+  std::cerr << "\n\n===== interference graph =====\n\n";
+  for (auto [k, v] : interf) {
+    std::cerr << k << ": ";
+    for (auto val : v)
+      std::cerr << val << " ";
+    std::cerr << "\n";
+  }
+}
+
+[[gnu::unused]] void dumpAssignment(Region *region, const std::unordered_map<Value*, Reg> &assignment) {
+  std::cerr << region;
+  std::cerr << "\n\n===== assignment =====\n\n";
+  for (auto [k, v] : assignment) {
+    std::cerr << k << " = " << regname(v) << "\n";
+  }
+}
+
 }
 
 namespace opt {
@@ -62,6 +81,9 @@ void RegAlloc::markBlockConflict(Block *bb) {
       if (!lastUsed.count(v))
         lastUsed[v] = i;
     }
+    if (isa<WriteRegOp>(op))
+      priority[op->val()] = 1;
+
     for (auto v : op->getResults()) {
       defined[v] = i;
 
@@ -69,12 +91,7 @@ void RegAlloc::markBlockConflict(Block *bb) {
       // Actually this should be eliminated with DCE, but we need to take care of it.
       if (!lastUsed.count(v))
         lastUsed[v] = i + 1;
-
-      // Precolor.
-      if (auto wr = dyn_cast<WriteRegOp>(op)) {
-        assignment[v] = (Reg) wr->reg;
-        priority[v] = 1;
-      }
+      
       if (isa<ReadRegOp>(op))
         priority[v] = 1;
       
@@ -176,10 +193,10 @@ void RegAlloc::allocate(Block *bb, bool isLeaf) {
       }
 
       // See if there's any preferred register.
-      int preferred = -1;
+      unsigned long preferred = -1;
       for (auto use : v->getUses()) {
         if (auto wr = dyn_cast<WriteRegOp>(use)) {
-          int reg = wr->reg;
+          auto reg = wr->reg;
           if (!bad.count((Reg) reg)) {
             preferred = reg;
             break;
@@ -187,12 +204,12 @@ void RegAlloc::allocate(Block *bb, bool isLeaf) {
         }
       }
       if (auto rd = dyn_cast<ReadRegOp>(op)) {
-        int reg = rd->reg;
+        auto reg = rd->reg;
         if (!bad.count((Reg) reg))
           preferred = reg;
       }
 
-      if (preferred != -1) {
+      if (preferred != -1ull) {
         assignment[v] = (Reg) preferred;
         continue;
       }

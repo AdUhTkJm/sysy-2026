@@ -30,24 +30,21 @@ declare_pass(RangedFold) {
   };
 
   walk(module, [](Op *op) {
-    if (isa<IntOp>(op))
-      return;
-
     auto it = rangeResult.find(op);
     if (it == rangeResult.end())
       return;
 
     auto env = it->second;
     Builder builder;
-    for (auto v : op->getResults()) {
+    for (auto v : op->getOperands()) {
       if (!env.count(v))
         continue;
 
       data::Interval i = env[v];
-      if (i.lo != i.hi)
+      if (i.lo != i.hi || isa<IntOp>(v->def))
         continue;
 
-      builder.setAfter(op);
+      builder.setBefore(op);
       auto vi = builder.createInt(i.lo);
       v->replaceAllUsesThat(vi->ret(), [&](Op *op) {
         return rangeResult.count(op) && env.data == rangeResult.at(op).data;

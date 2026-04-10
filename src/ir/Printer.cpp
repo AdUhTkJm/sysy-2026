@@ -398,7 +398,10 @@ printer(CselLtIOp) {
     } \
     assert(x[0] == 'b'); /* b.eq set of instructions need a cmp before them. */ \
     x.insert(x.begin() + 1, '.'); /* Change `beq` to `b.eq`. */ \
-    os << "cmp "; \
+    if (x.back() == 'F') /* BeqFOp will generate `b.eqF`. We need to remove the `f`. */ \
+      os << "fcmp ", x.pop_back(); \
+    else \
+      os << "cmp "; \
     printer->printOperands(os, op); \
     printer->printNewline(os); \
     os << x << ' ' << printer->str(br->target); \
@@ -497,9 +500,12 @@ printer(WriteRegOp) {
   auto val = wr->val();
   std::string name = regname(wr->reg);
   std::string opname = "mov ";
-  if (val->type == i32)
+  if (val->type == i32) {
+    assert(name[0] == 'x' || name[0] == '%');
     name[0] = 'w';
+  }
   if (val->type == f32) {
+    assert(name[0] == 'v' || name[0] == '%');
     name[0] = 's';
     opname = "fmov ";
   }
@@ -515,9 +521,12 @@ printer(ReadRegOp) {
   auto ret = wr->ret();
   std::string name = regname(wr->reg);
   std::string opname = "mov ";
-  if (ret->type == i32)
+  if (ret->type == i32) {
+    assert(name[0] == 'x' || name[0] == '%');
     name[0] = 'w';
+  }
   if (ret->type == f32) {
+    assert(name[0] == 'v' || name[0] == '%');
     name[0] = 's';
     opname = "fmov ";
   }

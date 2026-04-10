@@ -10,6 +10,13 @@ declare_local_pass(DestroyPhi,
   void spill(Value *v);
 ) {
   auto region = func->getRegion();
+
+  // Remove unused phis. Regalloc will mark them as not colliding with other phis,
+  // but after destruction they would.
+  for_all(PhiOp) {
+    if (op->ret()->getUses().empty())
+      op->erase();
+  }
   
   region->updatePreds();
   splitCriticalEdge(region);

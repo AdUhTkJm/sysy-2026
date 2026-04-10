@@ -90,8 +90,8 @@ struct Env {
 struct ConstEnv {
   const Env::Data *const data;
 
-  Interval operator[](const ir::Value *v) const { return data->at(v); }
-  Interval at(const ir::Value *v) const { return data->at(v); }
+  Interval operator[](const ir::Value *v) const { return data->count(v) ? data->at(v) : Interval(); }
+  Interval at(const ir::Value *v) const { return (*this)[v]; }
   int count(const ir::Value *v) const { return data->count(v); }
 
   ConstEnv(Env x): data(x.data) {}

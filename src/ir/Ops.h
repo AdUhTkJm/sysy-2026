@@ -36,7 +36,8 @@ public: \
   X(ReturnOp) X(BreakOp) X(ContinueOp) X(YieldOp) X(UnreachableOp)
 
 #define arm_branch_op_list(X) \
-  X(BeqOp) X(BneOp) X(BltOp) X(BleOp) X(CbzOp) X(CbnzOp) X(BgeOp) X(BgtOp)
+  X(BeqOp) X(BneOp) X(BltOp) X(BleOp) X(CbzOp) X(CbnzOp) X(BgeOp) X(BgtOp) \
+  X(BeqFOp) X(BneFOp) X(BltFOp) X(BleFOp) X(BgeFOp) X(BgtFOp)
 
 #define branch_op_list(X) \
   arm_branch_op_list(X) \

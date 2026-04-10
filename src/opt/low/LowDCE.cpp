@@ -7,7 +7,8 @@ namespace opt {
   X(AddXIOp) X(AddWIOp) X(AddWOp) X(AddLOp) X(AddXOp) X(AddXPOp) X(AdrpOp) \
   X(CmpEqOp) X(CmpLeOp) X(CmpLtOp) X(CmpNeOp) X(MovIOp) X(LslWOp) X(LslWIOp) \
   X(SubWOp) X(SubXOp) X(SubWIOp) X(SubXIOp) X(MulWOp) X(MulXOp) X(DivWOp) \
-  X(DivXOp) X(LdrOp) X(LdrLslOp) X(MovIOp) X(EorWOp) X(EorWIOp) X(MovLOp)
+  X(DivXOp) X(LdrOp) X(LdrLslOp) X(MovIOp) X(EorWOp) X(EorWIOp) X(MovLOp) \
+  X(FcmpEqOp) X(FcmpLeOp) X(FcmpLtOp) X(FcmpNeOp) 
 
 #define removable_decl(Ty) isa<Ty>(op) ||
 

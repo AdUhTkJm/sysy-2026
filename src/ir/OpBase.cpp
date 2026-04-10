@@ -1,6 +1,7 @@
 #include "Attrs.h"
 #include "Builder.h"
 #include "Printer.h"
+#include "../opt/Pass.h"
 
 #include <deque>
 #include <unordered_map>
@@ -774,7 +775,7 @@ void Region::updateLiveness() const {
     for (auto op : bb->getOps()) {
       if (auto phi = dyn_cast<PhiOp>(op)) {
         phis[bb].insert(phi);
-        phidefs[bb].insert(phi->getResult());
+        phidefs[bb].insert(phi->ret());
         continue;
       }
 
@@ -798,48 +799,39 @@ void Region::updateLiveness() const {
     return bb->succs.size() == 0;
   });
 
-  bool changed;
-  do {
-    changed = false;
-    for (auto bb : bbs) {
-      auto liveInOld = bb->liveIn;
+  fixed(for (auto bb : bbs) {
+    auto liveInOld = bb->liveIn;
 
-      // LiveOut(B) = \bigcup_{S\in succ(B)} (LiveIn(S) - PhiDefs(S)) \cup PhiUses(B)
-      // Here PhiUses(B) means the set of variables used in Phi nodes of S that come from B.
-      std::set<Value*> liveOut;
-      for (auto succ : bb->succs) {
-        std::set_difference(
-          succ->liveIn.begin(), succ->liveIn.end(),
-          phidefs[succ].begin(), phidefs[succ].end(),
-          std::inserter(liveOut, liveOut.end())
-        );
-        for (auto phi : phis[succ]) {
-          auto &ops = phi->getOperands();
-          for (size_t i = 0; i < ops.size(); i++) {
-            if (phi->targets[i] == bb)
-              liveOut.insert(ops[i]);
-          }
-        }
-      }
-
-      bb->liveOut = liveOut;
-
-      // LiveIn(B) = PhiDefs(B) \cup UpwardExposed(B) \cup (LiveOut(B) - Defs(B))
-      bb->liveIn.clear();
+    // LiveOut(B) = \bigcup_{S\in succ(B)} (LiveIn(S) - PhiDefs(S)) \cup PhiUses(B)
+    // Here PhiUses(B) means the set of variables used in Phi nodes of S that come from B.
+    std::set<Value*> liveOut;
+    for (auto succ : bb->succs) {
       std::set_difference(
-        liveOut.begin(), liveOut.end(),
-        defined[bb].begin(), defined[bb].end(),
-        std::inserter(bb->liveIn, bb->liveIn.end())
+        succ->liveIn.begin(), succ->liveIn.end(),
+        phidefs[succ].begin(), phidefs[succ].end(),
+        std::inserter(liveOut, liveOut.end())
       );
-      for (auto x : upwardExposed[bb])
-        bb->liveIn.insert(x);
-      for (auto x : phis[bb])
-        bb->liveIn.insert(x->getResult());
-
-      if (liveInOld != bb->liveIn)
-        changed = true;
+      for (auto phi : phis[succ])
+        liveOut.insert(phi->incomingFrom(bb));
     }
-  } while (changed);
+
+    bb->liveOut = liveOut;
+
+    // LiveIn(B) = PhiDefs(B) \cup UpwardExposed(B) \cup (LiveOut(B) - Defs(B))
+    bb->liveIn.clear();
+    std::set_difference(
+      liveOut.begin(), liveOut.end(),
+      defined[bb].begin(), defined[bb].end(),
+      std::inserter(bb->liveIn, bb->liveIn.end())
+    );
+    for (auto x : upwardExposed[bb])
+      bb->liveIn.insert(x);
+    for (auto x : phidefs[bb])
+      bb->liveIn.insert(x);
+
+    if (liveInOld != bb->liveIn)
+      mark_changed;
+  });
 }
 
 void Region::convertToPhi() {

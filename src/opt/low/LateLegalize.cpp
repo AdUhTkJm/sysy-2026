@@ -43,6 +43,9 @@ static Op *flip(Op *op) {
   cvt(BeqOp, BneOp)
   cvt(BltOp, BgeOp)
   cvt(BleOp, BgtOp)
+  cvt(BeqFOp, BneFOp)
+  cvt(BltFOp, BgeFOp)
+  cvt(BleFOp, BgtFOp)
   assert(false && "should only flip branches!");
 }
 

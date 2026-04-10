@@ -110,19 +110,17 @@ void Range::runOp(Op *op) {
       auto vl = cur[l], vr = cur[r];
       // The if-branch is unreachable.
       if (vl.lo >= vr.hi) {
-        op->set<UnreachableAttr>(0);
         runImpl(op->getRegion(1));
         return;
       }
       // The else-branch is unreachable.
       if (vl.hi < vr.lo) {
-        op->set<UnreachableAttr>(1);
         runImpl(op->getRegion(0));
         return;
       }
 
       envl[l] = envl[l].intersect({ vl.lo, vr.hi - 1 });
-      envl[r] = envl[r].intersect({ vl.lo, vr.hi - 1 });
+      envl[r] = envl[r].intersect({ vl.lo + 1, vr.hi });
 
       envr[l] = envr[l].intersect({ vr.lo, vl.hi });
       envr[r] = envr[r].intersect({ vr.lo, vl.hi });
@@ -133,6 +131,22 @@ void Range::runOp(Op *op) {
     cur = envr;
     runImpl(op->getRegion(1));
     cur = old;
+
+    // Check the yields.
+    auto lastL = op->getRegion(0)->getLastOp(), lastR = op->getRegion(1)->getLastOp();
+    for (unsigned i = 0; i < op->getNumResults(); i++) {
+      if (!isa<YieldOp>(lastL)) {
+        if (!isa<YieldOp>(lastR))
+          break;
+
+        std::swap(lastL, lastR);
+      }
+
+      if (isa<YieldOp>(lastR))
+        cur[op->ret(i)] = envl[lastL->val(i)].join(envr[lastR->val(i)]);
+      else
+        cur[op->ret(i)] = envl[lastL->val(i)];
+    }
   }
 
   if (isa<DoWhileOp>(op)) {
@@ -141,6 +155,43 @@ void Range::runOp(Op *op) {
     auto last = cast<ConditionOp>(region->getLastOp());
     auto cond = last->val()->def;
     auto inloop = cur.clone(), outloop = cur.clone();
+
+    // For loops too deep, don't do this.
+    // This is mainly for efficiency: the algorithm is O(t^depth) for some constant `t`.
+    // For 6-8 nested loops it just runs forever.
+    int depth = 0;
+    for (Op *runner = op; !isa<FuncOp>(runner); runner = runner->getParentOp()) {
+      if (isa<DoWhileOp>(runner))
+        depth++;
+    }
+    if (depth < 3) {
+      for (unsigned i = 0; i < op->getNumResults(); i++) {
+        if (op->ret(i)->type == i32)
+          inloop[op->ret(i)] = inloop[op->val(i)];
+      }
+      auto old = cur;
+      fixed(
+      cur = inloop.clone();
+      // Infer the range inside the loop.
+      runImpl(op->getRegion());
+      
+      // Update the range based on condition result.
+      for (unsigned i = 1; i < last->getNumOperands(); i++) {
+        auto v = op->ret(i - 1);
+        auto next = __index > 3
+          ? inloop[v].widen(cur[last->val(i)])
+          : inloop[v].join(cur[last->val(i)]);
+        if (inloop[v] != next) {
+          inloop[v] = next;
+          mark_changed;
+        }
+      }
+      delete cur.data;)
+
+      // Further refinement.
+      cur = old;
+    }
+
     if (isa<LtOp>(cond)) {
       // We suppose that the loop condition is `i + a < n`,
       // where `i` is the induction variable.
@@ -204,11 +255,26 @@ void Range::tidyUnreachable() {
     if (!isa<IfOp>(op))
       return;
 
-    auto unreachable = op->get<UnreachableAttr>();
-    if (!unreachable)
+    int unreachable = -1;
+    auto cond = op->val()->def;
+    auto it = rangeResult.find(op);
+    if (it == rangeResult.end())
       return;
 
-    auto preserved = op->getRegion(!unreachable->region);
+    if (isa<LtOp>(cond)) {
+      auto l = cond->val(0), r = cond->val(1);
+      auto vl = it->second[l], vr = it->second[r];
+      // The if-branch is unreachable.
+      if (vl.lo >= vr.hi)
+        unreachable = 0;
+      // The else-branch is unreachable.
+      if (vl.hi < vr.lo)
+        unreachable = 1;
+    }
+    if (unreachable == -1)
+      return;
+
+    auto preserved = op->getRegion(!unreachable);
     auto yield = preserved->getLastOp();
     for (auto bb : *preserved)
       bb->inlineBefore(op);

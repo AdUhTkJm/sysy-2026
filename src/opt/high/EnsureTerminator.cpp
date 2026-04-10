@@ -60,8 +60,7 @@ declare_pass(EnsureTerminator,
     loop_with(BreakOp, removeBreak);
     loop_with(ContinueOp, removeContinue);
   } while (!(terminator_container_list(container_empty) true));
-  module->dump();
-  
+
   fixed(
     loop_and_mark_changed(IfOp, canonicalizeReturn);
     loop_and_mark_changed(DoWhileOp, canonicalizeReturn);

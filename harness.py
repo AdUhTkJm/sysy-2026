@@ -44,13 +44,17 @@ def run_test(test_path: Path, *, qemu_timeout_s: float) -> tuple[bool, None | fl
         ...
 
   try:
-    hcc = subprocess.run(
-      [COMPILER, str(test_path), "-o", str(asm_path)],
-      stdout=subprocess.PIPE,
-      stderr=subprocess.PIPE,
-      text=True,
-      env={"ASAN_OPTIONS": "detect_leaks=0"},
-    )
+    try:
+      hcc = subprocess.run(
+        [COMPILER, str(test_path), "-o", str(asm_path)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env={"ASAN_OPTIONS": "detect_leaks=0"},
+        timeout=5
+      )
+    except:
+      return False, None, f"hcc timeout after 5.0s: {test_path}"
 
     if hcc.returncode != 0:
       return False, None, f"hcc error (rc={hcc.returncode}): {test_path}"
@@ -86,7 +90,7 @@ def run_test(test_path: Path, *, qemu_timeout_s: float) -> tuple[bool, None | fl
         timeout=qemu_timeout_s,
       )
     except subprocess.TimeoutExpired:
-      return False, None, f"timeout after {qemu_timeout_s}s: {test_path}"
+      return False, None, f"qemu timeout after {qemu_timeout_s}s: {test_path}"
     finally:
       try:
         if exe_path.exists():

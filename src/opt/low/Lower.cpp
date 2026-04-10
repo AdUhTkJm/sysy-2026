@@ -12,6 +12,14 @@ declare_pass(Lower,
   printer.setBlockPrefix(".L");
   for (auto x : collectFunctions())
     runImpl(x);
+
+  for_all(PhiOp) {
+    if (op->getNumOperands() != 1)
+      continue;
+
+    op->ret()->replaceAllUsesWith(op->val());
+    op->erase();
+  }
 }
 
 void Lower::runImpl(FuncOp *func) {

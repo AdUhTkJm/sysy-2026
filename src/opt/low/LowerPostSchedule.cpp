@@ -62,7 +62,7 @@ declare_local_pass(LowerPostSchedule) {
     builder.setBefore(op);
     if (op->getNumOperands() > 0) {
       auto wr = builder.create<WriteRegOp>()->with(op->val());
-      wr->reg = x0;
+      wr->reg = regbank(op->val()->type) == INT ? x0 : v0;
     }
 
     builder.rename<RetOp>(op);
