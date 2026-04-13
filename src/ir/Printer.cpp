@@ -535,6 +535,12 @@ printer(ReadRegOp) {
   if (retreg == name && !printer->showHidden)
     return;
   os << opname << retreg << ", " << name;
+
+  if (printer->showHidden && op->getNumOperands() > 0) {
+    os << ": colliding with ";
+    for (auto x : op->getOperands())
+      os << printer->str(x) << " ";
+  }
 }
 
 printer(CastOp) {
@@ -558,6 +564,10 @@ attr_printer(SizeAttr) {
 
 attr_printer(DimAttr) {
   os << "<dims = " << cast<DimAttr>(attr)->dims << ">";
+}
+
+attr_printer(StackOffsetAttr) {
+  os << "<offset = " << cast<StackOffsetAttr>(attr)->size << ">";
 }
 
 attr_printer(ArgDimAttr) {

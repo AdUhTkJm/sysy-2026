@@ -49,7 +49,7 @@ namespace opt {
 declare_pass(RegAlloc,
   void runImpl(Region *region, bool isLeaf);
   void markBlockConflict(Block *bb);
-  void allocate(Block *bb, bool isLeaf);
+  void allocate(Value *v, bool isLeaf);
   void clearState();
   void checkLegality(Region *region) const;
 
@@ -155,81 +155,80 @@ void RegAlloc::markBlockConflict(Block *bb) {
   }
 }
 
-void RegAlloc::allocate(Block *bb, bool isLeaf) {
+void RegAlloc::allocate(Value *v, bool isLeaf) {
   const Reg *order = isLeaf ? leafOrder : normalOrder;
   const Reg *orderf = isLeaf ? leafOrderf : normalOrderf;
 
-  for (auto op : *bb) {
-    for (auto v : op->getResults()) {
-      if (assignment.count(v))
-        continue;
+  auto op = v->def;
+  if (assignment.count(v))
+    return;
 
-      std::set<Reg> bad, unpreferred;
+  std::set<Reg> bad, unpreferred;
+  if (auto it = bads.find(v); it != bads.end())
+    std::copy(it->second.begin(), it->second.end(), std::inserter(bad, bad.begin()));
 
-      for (auto z : interf[v]) {
-        // In the whole function, `sp` and `zero` are read-only.
-        if (assignment.count(z) && assignment[z] != sp && assignment[z] != xzr)
-          bad.insert(assignment[z]);
+  for (auto z : interf[v]) {
+    // In the whole function, `sp` and `zero` are read-only.
+    if (assignment.count(z) && assignment[z] != sp && assignment[z] != xzr)
+      bad.insert(assignment[z]);
+  }
+
+  if (isa<PhiOp>(op)) {
+    // Dislike everything that might interfere with phi's operands.
+    const auto &operands = phiOperand[v];
+    for (auto x : operands) {
+      for (auto v : interf[x]) {
+        if (assignment.count(v) && assignment[v] != sp && assignment[v] != xzr)
+          unpreferred.insert(assignment[v]);
       }
-
-      if (isa<PhiOp>(op)) {
-        // Dislike everything that might interfere with phi's operands.
-        const auto &operands = phiOperand[v];
-        for (auto x : operands) {
-          for (auto v : interf[x]) {
-            if (assignment.count(v) && assignment[v] != sp && assignment[v] != xzr)
-              unpreferred.insert(assignment[v]);
-          }
-        }
-      }
-
-      if (prefer.count(v)) {
-        auto ref = prefer[v];
-        // Try to allocate the same register as `ref`.
-        if (assignment.count(ref) && !bad.count(assignment[ref])) {
-          assignment[v] = assignment[ref];
-          continue;
-        }
-      }
-
-      // See if there's any preferred register.
-      unsigned long preferred = -1;
-      for (auto use : v->getUses()) {
-        if (auto wr = dyn_cast<WriteRegOp>(use)) {
-          auto reg = wr->reg;
-          if (!bad.count((Reg) reg)) {
-            preferred = reg;
-            break;
-          }
-        }
-      }
-      if (auto rd = dyn_cast<ReadRegOp>(op)) {
-        auto reg = rd->reg;
-        if (!bad.count((Reg) reg))
-          preferred = reg;
-      }
-
-      if (preferred != -1ull) {
-        assignment[v] = (Reg) preferred;
-        continue;
-      }
-
-      // Assign a register by enumerating.
-      auto rn = regbank(v->type) == INT ? regcnt : regcntf;
-      auto regs = regbank(v->type) == INT ? order : orderf;
-
-      for (int i = 0; i < rn; i++) {
-        if (!bad.count(regs[i])) {
-          assignment[v] = (Reg) regs[i];
-          break;
-        }
-      }
-
-      // The value must be spilled.
-      if (!assignment.count(v))
-        spill(v, bb->getParentRegion(), op->getResultIndex(v));
     }
   }
+
+  if (prefer.count(v)) {
+    auto ref = prefer[v];
+    // Try to allocate the same register as `ref`.
+    if (assignment.count(ref) && !bad.count(assignment[ref])) {
+      assignment[v] = assignment[ref];
+      return;
+    }
+  }
+
+  // See if there's any preferred register.
+  unsigned long preferred = -1;
+  for (auto use : v->getUses()) {
+    if (auto wr = dyn_cast<WriteRegOp>(use)) {
+      auto reg = wr->reg;
+      if (!bad.count((Reg) reg)) {
+        preferred = reg;
+        break;
+      }
+    }
+  }
+  if (auto rd = dyn_cast<ReadRegOp>(op)) {
+    auto reg = rd->reg;
+    if (!bad.count((Reg) reg))
+      preferred = reg;
+  }
+
+  if (preferred != -1ull) {
+    assignment[v] = (Reg) preferred;
+    return;
+  }
+
+  // Assign a register by enumerating.
+  auto rn = regbank(v->type) == INT ? regcnt : regcntf;
+  auto regs = regbank(v->type) == INT ? order : orderf;
+
+  for (int i = 0; i < rn; i++) {
+    if (!bad.count(regs[i])) {
+      assignment[v] = (Reg) regs[i];
+      break;
+    }
+  }
+
+  // The value must be spilled.
+  if (!assignment.count(v))
+    spill(v, op->getParentRegion(), op->getResultIndex(v));
 }
 
 void RegAlloc::clearState() {
@@ -245,8 +244,19 @@ void RegAlloc::runImpl(Region *region, bool isLeaf) {
   clearState();
   for (auto bb : region->getBlocks())
     markBlockConflict(bb);
-  for (auto bb : region->getBlocks())
-    allocate(bb, isLeaf);
+
+  std::vector<Value*> values;
+  for (auto bb : region->getBlocks()) {
+    for (auto op : *bb) {
+      for (auto v : op->getResults())
+        values.push_back(v);
+    }
+  }
+  std::sort(values.begin(), values.end(), [&](Value *l, Value *r) {
+    return priority[l] == priority[r] ? interf[l].size() > interf[r].size() : priority[l] > priority[r];
+  });
+  for (auto v : values)
+    allocate(v, isLeaf);
   for_all(BlOp, region->getParentOp())
     op->clearResults();
 }

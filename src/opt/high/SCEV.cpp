@@ -8,6 +8,8 @@ namespace opt {
 
 declare_pass(SCEV,
   void evolve(DoWhileOp *loop);
+  void tidy(DoWhileOp *loop);
+
   Value *generate(Value *ind, const Expr &delta);
   Value *generateStart(Value *target, Op *anchor);
   void moveChainBefore(Op *op, Op *anchor);
@@ -22,6 +24,9 @@ declare_pass(SCEV,
 ) {
   for_all(DoWhileOp)
     evolve(op);
+
+  for_all(DoWhileOp)
+    tidy(op);
 }
 
 #define creation_list(X) \
@@ -293,6 +298,20 @@ void SCEV::evolve(DoWhileOp *loop) {
 
   for (auto [k, v] : deferred)
     k->replaceAllUsesWith(v);
+}
+
+void SCEV::tidy(DoWhileOp *loop) {
+  auto last = cast<ConditionOp>(loop->getRegion()->getLastOp());
+  for (unsigned i = loop->getNumResults(); i--;) {
+    if (last->val(i + 1) != loop->ret(i))
+      continue;
+
+    // The value never changes. We replace all uses to it with the start value.
+    loop->ret(i)->replaceAllUsesWith(loop->val(i));
+    loop->removeResult(i);
+    loop->removeOperand(i);
+    last->removeOperand(i + 1);
+  }
 }
 
 }

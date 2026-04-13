@@ -12,7 +12,7 @@ namespace ir {
 #define attr_list(X) \
   X(IntAttr) X(SizeAttr) X(DimAttr) X(ArgDimAttr) \
   X(ConstIArrAttr) X(ConstFArrAttr) X(UnerasableAttr) X(RecursiveAttr) \
-  X(IncomingStackArgAttr) X(NonIdempotentAttr) X(UnreachableAttr)
+  X(IncomingStackArgAttr) X(NonIdempotentAttr) X(UnreachableAttr) X(StackOffsetAttr)
 
 class Block;
 class Value;

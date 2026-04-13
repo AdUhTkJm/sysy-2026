@@ -25,4 +25,7 @@ struct ArgLoc {
 // and the total number of outgoing stack bytes (16-byte aligned).
 int argLayout(const std::vector<const Type *> &types, std::vector<ArgLoc> &out);
 
+// Registers that are not allowed for a specific value.
+extern std::unordered_map<Value*, std::set<Reg>> bads;
+
 }

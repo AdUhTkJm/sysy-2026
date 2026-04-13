@@ -2,6 +2,8 @@
 
 namespace opt {
 
+std::unordered_map<Value*, std::set<Reg>> bads;
+
 #define rename(From, To) \
   for_all(From, func) \
     builder.rename<To>(op);
@@ -154,6 +156,8 @@ void Lower::runImpl(FuncOp *func) {
   argLayout(ptypes, locs);
   auto spRd = createAssignedRd(builder, sp);
   unsigned j = 0;
+
+  std::vector<ReadRegOp*> ops;
   for (auto [i, arg] : data::enumerate(func->getResults())) {
     if (i == 0)
       continue;
@@ -162,6 +166,12 @@ void Lower::runImpl(FuncOp *func) {
       auto rd = builder.create<ReadRegOp>(arg->type);
       rd->reg = loc.reg;
       arg->replaceAllUsesWith(rd->ret());
+
+      // Note that each ReadRegOp collides with later ones.
+      for (auto x : ops)
+        bads[x->ret()].insert(loc.reg);
+
+      ops.push_back(rd);
     } else {
       auto ldr = builder.create<LdrOp>(arg->type)->with(spRd->ret());
       ldr->value = loc.stackOffset;
