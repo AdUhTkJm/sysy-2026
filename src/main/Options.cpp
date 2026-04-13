@@ -66,6 +66,7 @@ Options parseArgs(int argc, char **argv) {
     PARSEOPT("--verify", verify);
     PARSEOPT("--print-all", printAll);
     PARSEOPT("--print-type", printType);
+    PARSEOPT("--no-range", norange);
     PARSEOPT("--interpret", interpret);
 
     if (opts.inputFile != "") {

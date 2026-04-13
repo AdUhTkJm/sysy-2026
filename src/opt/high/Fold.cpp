@@ -12,9 +12,11 @@ namespace opt {
 static Rule rules[] = {
   Rule("(addi x (int 'a))") >> "x" when zero,
   Rule("(addi (int 'a) (int 'b))") >> "(int:i32 (!add 'a 'b))",
+  Rule("(addi (int 'a) x)") >> "(addi:i32 x (int:i32 'a))",
   Rule("(addi (subi (int 'a) x) (int 'b))") >> "(subi:i32 (int:i32 (!add 'a 'b)) x)",
   Rule("(addi (addi x (int 'a)) (int 'b))") >> "(addi:i32 x (int:i32 (!add 'a 'b)))",
   Rule("(addi (addi x y) (subi z y))") >> "(addi:i32 x z)",
+  Rule("(addi x x)") >> "(muli:i32 x (int:i32 2))",
   Rule("(addi (addi x (int 'a)) y)") >> "(addi:i32 (addi:i32 x y) (int:i32 'a))",
   Rule("(addi (subi (int 'a) x) y)") >> "(subi:i32 y x)" when zero,
 
@@ -54,6 +56,15 @@ static Rule rules[] = {
   Rule("(modi (int 'a) (int 'b))") >> "(int:i32 (!mod 'a 'b))",
   
   Rule("(lt (int 'a) (int 'b))") >> "(int:i32 (!lt 'a 'b))",
+  Rule("(lt x (subi y z))") >> "(lt:i32 (addi:i32 x z) y)",
+  Rule("(lt (subi (int 'a) x) (int 'b))") >> "(lt:i32 (int:i32 (!sub 'a 'b)) x)",
+  Rule("(lt (muli x (int 'a)) (int 'b))") >> "(lt:i32 x (int:i32 (!div 'b 'a)))" when {
+    return imm("'a") > 0 && imm("'b") > 0 && imm("'b") % imm("'a") == 0;
+  },
+  Rule("(lt (muli x (int 'a)) (int 'b))") >> "(lt:i32 x (int:i32 (!add (!div 'b 'a) 1)))" when {
+    return imm("'a") > 0 && imm("'b") > 0 && imm("'b") % imm("'a") != 0;
+  },
+
   Rule("(le (int 'a) (int 'b))") >> "(int:i32 (!le 'a 'b))",
   Rule("(eq (int 'a) (int 'b))") >> "(int:i32 (!eq 'a 'b))",
   Rule("(ne (int 'a) (int 'b))") >> "(int:i32 (!ne 'a 'b))",

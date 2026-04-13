@@ -18,6 +18,7 @@ struct Options {
   option printType;
   option printAll;
   option interpret;
+  option norange;
 
   int beforeIndex, afterIndex;
 

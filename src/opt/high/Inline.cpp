@@ -48,6 +48,7 @@ void Inline::runImpl(FuncOp *func) {
     // Do the real inlining.
     Builder builder(op);
     Builder::Map map;
+    Builder::OpMap opmap;
 
     // Replace arguments.
     // Note both function arguments and call arguments start from 1.
@@ -56,7 +57,7 @@ void Inline::runImpl(FuncOp *func) {
 
     auto region = fn->getRegion();
     assert(region->getNumBlocks() == 1);
-    builder.copy(region->getFirstBlock(), map);
+    builder.copy(region->getFirstBlock(), map, opmap);
 
     // Replace user sites.
     auto mappedReturn = op->prevOp();

@@ -301,7 +301,7 @@ void SCEV::evolve(DoWhileOp *loop) {
 }
 
 void SCEV::tidy(DoWhileOp *loop) {
-  auto last = cast<ConditionOp>(loop->getRegion()->getLastOp());
+  auto last = condition_of(loop);
   for (unsigned i = loop->getNumResults(); i--;) {
     if (last->val(i + 1) != loop->ret(i))
       continue;
@@ -311,6 +311,32 @@ void SCEV::tidy(DoWhileOp *loop) {
     loop->removeResult(i);
     loop->removeOperand(i);
     last->removeOperand(i + 1);
+  }
+
+  // Remove loop variables that start the same and increase the same.
+  struct Record {
+    Value *start;
+    Value *incr;
+    bool operator<(Record other) const { return start == other.start ? incr < other.incr : start < other.start; }
+  };
+  std::map<Record, Value *> vars;
+  for (unsigned i = loop->getNumResults(); i--;) {
+    auto increased = last->val(i + 1)->def;
+    auto indvar = loop->ret(i);
+
+    if ((!isa<AddIOp>(increased) && !isa<AddLOp>(increased)) || increased->val(0) != indvar)
+      continue;
+
+    auto start = loop->val(i);
+    Record key { start, increased->val(1) };
+    if (auto it = vars.find(key); it != vars.end()) {
+      indvar->replaceAllUsesWith(it->second);
+      loop->removeResult(i);
+      loop->removeOperand(i);
+      last->removeOperand(i + 1);
+    } else {
+      vars[key] = indvar;
+    }
   }
 }
 

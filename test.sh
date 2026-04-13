@@ -85,6 +85,9 @@ while [[ $# -gt 0 ]] do
   -a|--print-all)
     printall=1
     shift;;
+  --nr|--no-range|--no-ranges)
+    norange=1;
+    shift;;
   -d|--directory)
     if [[ $# -lt 2 ]]; then
       die "expected test directory"
@@ -195,6 +198,9 @@ if [[ -n $testcase ]]; then
   fi
   if [[ -n $interpret ]]; then
     cmd="$cmd --interpret"
+  fi
+  if [[ -n $norange ]]; then
+    cmd="$cmd --no-range"
   fi
   infile=${name/.sy/.in}
   if [[ -f $infile && ! -n $gdb ]]; then

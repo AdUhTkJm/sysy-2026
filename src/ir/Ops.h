@@ -19,7 +19,7 @@ public: \
   X(EqFOp) X(NeFOp) X(LtFOp) X(LeFOp) X(NotFOp) X(SextOp) \
   X(YieldOp) X(I2FOp) X(F2IOp) X(UndefOp) X(ContinueOp) X(BreakOp) \
   X(DoWhileOp) X(AddLOp) X(SubLOp) X(AddFOp) X(SubFOp) X(MulFOp) X(DivFOp) \
-  X(LShiftOp) X(RShiftOp) \
+  X(LShiftOp) X(RShiftOp) X(MinOp) X(MaxOp) X(SelectOp) \
   /* ARM operations */ \
   X(AddWOp) X(AddXOp) X(MaddWOp) X(MsubWOp) \
   X(SubWOp) X(SubXOp) X(MulWOp) X(MulXOp) \
@@ -27,7 +27,8 @@ public: \
   X(FaddOp) X(FsubOp) X(FmulOp) X(FdivOp) \
   X(RetOp) X(EorWOp) X(LslWOp) X(LsrWOp) X(AsrWOp) X(AndWOp) X(AndXOp) X(FmovOp) \
   X(FcmpEqOp) X(FcmpNeOp) X(FcmpLtOp) X(FcmpLeOp) X(FcvtzsOp) X(ScvtfOp) \
-  X(SxtwOp) X(SmullOp) \
+  X(SxtwOp) X(SmullOp) X(NegOp) X(NegsOp) X(CsnegMiOp) \
+  X(ArmMinOp) X(ArmMaxOp) \
   /* Auxiliary operations */ \
   X(CastOp) /* Casts between types; emits to nothing */ \
   X(UnreachableOp)
@@ -57,7 +58,7 @@ public: \
   X(EorWIOp) X(LdrLslOp) X(StrLslOp) \
   X(LslWIOp) X(LsrWIOp) X(AsrWIOp) X(AsrXIOp) \
   X(SubWIOp) X(SubXIOp) X(AndWIOp) X(AndXIOp) \
-  X(CselLtIOp)
+  X(CselLtIOp) X(CnegLtIOp)
 
 #define arm_mem_op_list(X) \
   X(LdrOp) X(StrOp) X(LdpOp) X(StpOp)
@@ -230,6 +231,8 @@ complete_op_list(opkind_map);
 
 extern const std::map<std::string, OpKind> opkindNames;
 const char *kindname(OpKind kind);
+
+#define condition_of(loop) cast<ConditionOp>(loop->getRegion()->getLastOp())
 
 }
 

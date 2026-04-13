@@ -42,6 +42,7 @@ public:
 
   // Maps from the original value to the copied value.
   using Map = std::map<Value *, Value *>;
+  using OpMap = std::map<Op *, Op *>;
 
   void setBefore(Op *op);
   void setAfter(Op *op);
@@ -97,9 +98,11 @@ public:
     return t;
   }
 
-  void copy(Block *bb, Map &map);
+  void copy(Block *bb, Map &map, OpMap &opmap);
   Op *clone(Op *op);
   Op *clone(Op *op, Map &map);
+  Op *clone(Op *op, OpMap &opmap);
+  Op *clone(Op *op, Map &map, OpMap &opmap);
 
   IntOp *createInt(int i);
   FloatOp *createFloat(float f);

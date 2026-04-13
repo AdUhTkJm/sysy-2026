@@ -1,6 +1,13 @@
 #include "Builder.h"
 #include "Ops.h"
 #include "Attrs.h"
+#include "Regs.h"
+
+namespace opt {
+
+extern std::unordered_map<ir::Value*, std::set<ir::Reg>> bads;
+
+}
 
 namespace ir {
 
@@ -117,15 +124,18 @@ Op *Builder::cloneImpl(Op *op) {
   return nullptr;
 }
 
-Op *Builder::clone(Op *op, Map &map) {
+Op *Builder::clone(Op *op, Map &map, OpMap &opmap) {
   auto cloned = cloneImpl(op);
   cloned->attrs = op->attrs;
+  opmap[op] = cloned;
 
   for (auto [i, ret] : data::enumerate(cloned->getResults())) {
     map[op->ret(i)] = ret;
-    // Copy register assignments, if present.
+    // Copy register assignments and illegal allocations, if present.
     if (auto it = assignment.find(ret); it != assignment.end())
       assignment[op->ret(i)] = it->second;
+    if (auto it = opt::bads.find(ret); it != opt::bads.end())
+      opt::bads[op->ret(i)] = it->second;
   }
 
   Builder::Guard _(*this);
@@ -136,7 +146,7 @@ Op *Builder::clone(Op *op, Map &map) {
     for (auto bb : *r) {
       auto newbb = region->appendBlock();
       setToStart(newbb);
-      copy(bb, map);
+      copy(bb, map, opmap);
     }
   }
 
@@ -144,14 +154,24 @@ Op *Builder::clone(Op *op, Map &map) {
 }
 
 Op *Builder::clone(Op *op) {
-  Map map;
-  return clone(op, map);
+  Map map; OpMap opmap;
+  return clone(op, map, opmap);
 }
 
-void Builder::copy(Block *bb, Map &map) {
+Op *Builder::clone(Op *op, Map &map) {
+  OpMap opmap;
+  return clone(op, map, opmap);
+}
+
+Op *Builder::clone(Op *op, OpMap &opmap) {
+  Map map;
+  return clone(op, map, opmap);
+}
+
+void Builder::copy(Block *bb, Map &map, OpMap &opmap) {
   std::vector<Op*> total;
   for (auto op : *bb) {
-    auto cloned = clone(op, map);
+    auto cloned = clone(op, map, opmap);
     total.push_back(cloned);
   }
 

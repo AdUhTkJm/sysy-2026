@@ -194,6 +194,9 @@ format(BreakOp, "break");
 format(SextOp, "$r0 = sext $x0");
 format(CondMarkerOp, "<condition begin>");
 format(UnreachableOp, "brk #0");
+format(MinOp, "$r0 = min($x0, $x1)");
+format(MaxOp, "$r0 = max($x0, $x1)");
+format(SelectOp, "$r0 = $x0 ? $x1 : $x2");
 /* ARM operations */
 format(AddWOp, "add $r0, $x0, $x1");
 format(AddXOp, "add $R0, $X0, $X1");
@@ -217,6 +220,10 @@ format(LsrWOp, "lsr $r0, $x0, $x1");
 format(AsrWOp, "asr $r0, $x0, $x1");
 format(SxtwOp, "sxtw $r0, $x0");
 format(SmullOp, "smull $r0, $x0, $x1");
+format(NegOp, "neg $r0, $x0");
+format(NegsOp, "negs $r0, $x0");
+format(ArmMinOp, "cmp $x0, $x1\ncsel $r0, $x0, $x1, lt");
+format(ArmMaxOp, "cmp $x0, $x1\ncsel $r0, $x0, $x1, gt");
 format(CmpEqOp, "cmp $x0, $x1\ncset $r0, eq");
 format(CmpNeOp, "cmp $x0, $x1\ncset $r0, ne");
 format(CmpLtOp, "cmp $x0, $x1\ncset $r0, lt");
@@ -225,6 +232,7 @@ format(FcmpEqOp, "fcmp $x0, $x1\ncset $r0, eq");
 format(FcmpNeOp, "fcmp $x0, $x1\ncset $r0, ne");
 format(FcmpLtOp, "fcmp $x0, $x1\ncset $r0, lt");
 format(FcmpLeOp, "fcmp $x0, $x1\ncset $r0, le");
+format(CsnegMiOp, "csneg $r0, $x0, $x1, mi");
 format(FmovOp, "fmov $r0, $x0");
 format(FcvtzsOp, "fcvtzs $r0, $x0");
 format(ScvtfOp, "scvtf $r0, $x0");
@@ -380,6 +388,13 @@ printer(CselLtIOp) {
   os << "cmp " << printer->str(op->val()) << ", #" << csel->value;
   printer->printNewline(os);
   os << "csel " << printer->str(op->ret()) << ", " << printer->str(op->val(1)) << ", " << printer->str(op->val(2)) << ", lt";
+}
+
+printer(CnegLtIOp) {
+  auto cneg = cast<CnegLtIOp>(op);
+  os << "cmp " << printer->str(op->val(0)) << ", #" << cneg->value;
+  printer->printNewline(os);
+  os << "cneg " << printer->str(op->ret()) << ", " << printer->str(op->val(1)) << ", lt";
 }
 
 #define arm_branch_printer(Ty) \
@@ -663,7 +678,7 @@ std::string Printer::str(const Value *value) {
   } else
     ss << name;
   
-  if (showRange && printing) {
+  if (!options.norange && showRange && printing) {
     auto it = opt::rangeResult.find(printing);
     if (it != opt::rangeResult.end()) {
       data::ConstEnv env = it->second;

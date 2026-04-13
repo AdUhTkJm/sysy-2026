@@ -196,6 +196,45 @@ Pass::CallGraph Pass::callGraph() const {
   return cg;
 }
 
+Value *Pass::increment(Value *indvar) const {
+  auto loop = indvar->def;
+  if (!isa<DoWhileOp>(loop))
+    return nullptr;
+
+  // Look at the condition at the end.
+  auto last = condition_of(loop);
+  auto index = loop->getResultIndex(indvar);
+  auto next = last->val(index + 1)->def;
+  if (!isa<AddIOp>(next) && !isa<AddLOp>(next))
+    return nullptr;
+  
+  if (next->val(0) == indvar)
+    return next->val(1);
+  if (next->val(1) == indvar)
+    return next->val(0);
+  return nullptr;
+}
+
+Value *Pass::indvar(DoWhileOp *loop, ir::Value **limit) const {
+  auto last = condition_of(loop);
+  auto cond = last->val(0)->def;
+
+  if (!isa<LtOp>(cond) || !isa<AddIOp>(cond->val(0)->def))
+    return nullptr;
+
+  // Generally speaking, what we're having here is `i + 'a < lim`.
+  auto add = cond->val(0)->def;
+  unsigned index;
+  if (limit)
+    *limit = cond->val(1);
+  if ((index = loop->getResultIndex(add->val(0))) != loop->getNumResults())
+    return add->val(0);
+  else if ((index = loop->getResultIndex(add->val(1))) != loop->getNumResults())
+    return add->val(1);
+
+  return nullptr;
+}
+
 void Pass::checkAssignmentLegality(Op *parent) const {
   walk(parent, [](Op *op) {
     if (isa<GlobalOp>(op) || isa<FuncOp>(op) || isa<AllocaOp>(op))

@@ -52,6 +52,8 @@ void Lower::runImpl(FuncOp *func) {
   rename(SextOp, SxtwOp);
   rename(LShiftOp, LslWOp);
   rename(RShiftOp, LsrWOp);
+  rename(MinOp, ArmMinOp);
+  rename(MaxOp, ArmMaxOp);
   
   for_all(NotOp, func) {
     builder.setBefore(op);

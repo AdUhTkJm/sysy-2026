@@ -38,8 +38,19 @@ declare_local_pass(InstCombine,
   bool rewrite(Op *op) const;
 
   bool rewriteMul(Op *op, Value *v, int mul) const;
-  bool rewriteDiv(Op *op, Value *v, int mul) const;
+  bool rewriteDiv(Op *op, Value *v, int div) const;
+  bool rewriteMod(Op *op, int mod) const;
 ) {
+  // We first rewrite all mods, otherwise it's very hard to reconstruct the pattern after divs are lowered.
+  walk<Postorder>(func, [&](Op *op) {
+    if (isa<MsubWOp>(op)) {
+      auto y = op->val(1);
+      // x % y is lowered as (msubw (sdivw x y) y x). Match it.
+      if (auto mov = dyn_cast<MovIOp>(y->def))
+        rewriteMod(op, mov->value);
+    }
+  });
+
   fixed(walk<Postorder>(func, [&](Op *op) {
     for (auto &rule : rules) {
       if (rule.rewrite(op)) {
@@ -296,6 +307,43 @@ bool InstCombine::rewriteDiv(Op *op, Value *v, int div) const {
 
     auto xsign = builder.create<AsrWIOp>(i32)->with(v); xsign->value = 31;
     builder.replace<SubWOp>(op, i32)->with(sra->ret(), xsign->ret());
+    return true;
+  }
+
+  return false;
+}
+
+bool InstCombine::rewriteMod(Op *op, int mod) const {
+  auto z = op->val(0);
+  auto y = op->val(1);
+  auto x = op->val(2);
+  
+  if (!isa<DivWOp>(z->def) || z->def->val(0) != x || z->def->val(1) != y || mod < 0)
+    return false;
+
+  Builder builder;
+  if (mod == 2) {
+    builder.setBefore(op);
+
+    // and     w8, w0, #1
+    // cmp     w0, #0
+    // cneg    w0, w8, lt
+    auto _and = builder.create<AndWIOp>(i32)->with(x); _and->value = 1;
+    auto cneg = builder.replace<CnegLtIOp>(op, i32)->with(x, _and->ret()); cneg->value = 0;
+    return true;
+  }
+
+  if (__builtin_popcount(mod) == 1) {
+    builder.setBefore(op);
+
+    // negs    w8, w0
+    // and     w9, w0, #(mod - 1)
+    // and     w8, w8, #(mod - 1)
+    // csneg   w0, w9, w8, mi
+    auto negs = builder.create<NegsOp>(i32)->with(x);
+    auto _and1 = builder.create<AndWIOp>(i32)->with(x); _and1->value = mod - 1;
+    auto _and2 = builder.create<AndWIOp>(i32)->with(negs->ret()); _and2->value = mod - 1;
+    builder.replace<CsnegMiOp>(op, i32)->with(_and1->ret(), _and2->ret());
     return true;
   }
 

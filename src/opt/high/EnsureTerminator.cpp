@@ -115,7 +115,7 @@ void EnsureTerminator::removeBreak(BreakOp *op) {
   builder.create<StoreOp>()->with(var->ret(), one->ret());
 
   // Make sure the variable is included for the loop condition.
-  auto cond = cast<ConditionOp>(loop->getRegion()->getLastOp());
+  auto cond = condition_of(loop);
   auto val = cond->val();
 
   builder.setBefore(cond);

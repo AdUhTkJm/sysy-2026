@@ -120,6 +120,11 @@ protected:
   // Retrieves the main function.
   ir::FuncOp *findMain() const { return findFunction("main"); }
 
+  // Finds the loop increment if present.
+  ir::Value *increment(ir::Value *indvar) const;
+  // Finds the loop variable tested in the loop condition, along with its limit.
+  ir::Value *indvar(ir::DoWhileOp *loop, ir::Value **limit = nullptr) const;
+
   void checkAssignmentLegality(ir::Op *parent) const;
 public:
   virtual void run() = 0;
