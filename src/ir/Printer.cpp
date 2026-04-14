@@ -155,8 +155,10 @@ format(SubIOp, "$r0 = $x0 - $x1");
 format(SubLOp, "$r0 = $x0 - $x1: i64");
 format(SubFOp, "$r0 = $x0 - $x1: f32");
 format(MulIOp, "$r0 = $x0 * $x1");
+format(MulLOp, "$r0 = $x0 * $x1: i64");
 format(MulFOp, "$r0 = $x0 * $x1: f32");
 format(DivIOp, "$r0 = $x0 / $x1");
+format(DivLOp, "$r0 = $x0 / $x1: i64");
 format(DivFOp, "$r0 = $x0 / $x1: f32");
 format(ModIOp, "$r0 = $x0 % $x1");
 format(AndIOp, "$r0 = $x0 & $x1");
@@ -320,6 +322,63 @@ printer(LdrOp) {
 printer(StrOp) {
   auto str = cast<StrOp>(op);
   os << "str " << printer->str(op->val(1)) << ", [" << printer->str(op->val(0)) << ", #" << str->value << "]";
+}
+
+// TODO: Bad in the sense that when `ret == incr` the fallback breaks.
+printer(LdrPostIncrOp) {
+  auto ldr = cast<LdrPostIncrOp>(op);
+  auto addr = printer->str(op->val());
+  auto incr = printer->str(op->ret(1));
+  auto ret  = printer->str(op->ret(0));
+  if (incr == addr) {
+    os << "ldr " << ret << ", [" << addr << "], #" << ldr->value;
+    return;
+  }
+  os << "ldr " << ret << ", [" << addr << ", #0]";
+  printer->printNewline(os);
+  os << "add " << incr << ", " << addr << ", #" << ldr->value << " // fallback: post-indexed";
+}
+
+printer(StrPostIncrOp) {
+  auto str = cast<StrPostIncrOp>(op);
+  auto addr = printer->str(op->val(0));
+  auto incr = printer->str(op->ret());
+  auto val  = printer->str(op->val(1));
+  if (incr == addr) {
+    os << "str " << val << ", [" << addr << "], #" << str->value;
+    return;
+  }
+  os << "str " << val << ", [" << addr << ", #0]";
+  printer->printNewline(os);
+  os << "add " << incr << ", " << addr << ", #" << str->value << " // fallback: post-indexed";
+}
+
+printer(LdrPreIncrOp) {
+  auto ldr = cast<LdrPreIncrOp>(op);
+  auto addr = printer->str(op->val());
+  auto incr = printer->str(op->ret(1));
+  auto ret  = printer->str(op->ret(0));
+  if (incr == addr) {
+    os << "ldr " << ret << ", [" << addr << ", #" << ldr->value << "]!";
+    return;
+  }
+  os << "add " << incr << ", " << addr << ", #" << ldr->value << " // fallback: pre-indexed";
+  printer->printNewline(os);
+  os << "ldr " << ret << ", [" << addr << ", #" << ldr->value << "]";
+}
+
+printer(StrPreIncrOp) {
+  auto str = cast<StrPreIncrOp>(op);
+  auto addr = printer->str(op->val(0));
+  auto incr = printer->str(op->ret());
+  auto val  = printer->str(op->val(1));
+  if (incr == addr) {
+    os << "str " << val << ", [" << addr << ", #" << str->value << "]!";
+    return;
+  }
+  os << "add " << incr << ", " << addr << ", #" << str->value << " // fallback: pre-indexed";
+  printer->printNewline(os);
+  os << "str " << val << ", [" << addr << ", #" << str->value << "]";
 }
 
 printer(LdrLslOp) {
@@ -560,13 +619,13 @@ printer(ReadRegOp) {
 
 printer(CastOp) {
   auto retreg = printer->str(op->ret()), fromreg = printer->str(op->val());
+  auto r = retreg; r[0] = 'x';
+  auto f = fromreg; f[0] = 'x';
   if (!printer->showHidden) {
-    auto r = retreg; r[0] = 'x';
-    auto f = fromreg; f[0] = 'x';
     if (r == f)
       return;
   }
-  os << "mov " << retreg << ", " << fromreg;
+  os << "mov " << r << ", " << f;
 }
 
 attr_printer(IntAttr) {
@@ -678,7 +737,7 @@ std::string Printer::str(const Value *value) {
   } else
     ss << name;
   
-  if (!options.norange && showRange && printing) {
+  if (options.ranges && showRange && printing) {
     auto it = opt::rangeResult.find(printing);
     if (it != opt::rangeResult.end()) {
       data::ConstEnv env = it->second;

@@ -109,6 +109,20 @@ void RegAlloc::markBlockConflict(Block *bb) {
         currentPriority += 2;
       }
     }
+
+    if (isa<CastOp>(op)) {
+      prefer[op->ret()] = op->val();
+      priority[op->ret()] = currentPriority;
+      priority[op->val()] = currentPriority + 1;
+    }
+    if (isa<LdrPreIncrOp>(op) || isa<LdrPostIncrOp>(op)) {
+      prefer[op->ret(1)] = op->val();
+      priority[op->val()] = priority[op->ret(1)] = ++currentPriority;
+    }
+    if (isa<StrPreIncrOp>(op) || isa<StrPostIncrOp>(op)) {
+      prefer[op->ret()] = op->val();
+      priority[op->val()] = priority[op->ret()] = ++currentPriority;
+    }
   }
 
   // For all liveOuts, they are last-used at place size().

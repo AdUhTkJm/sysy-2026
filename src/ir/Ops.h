@@ -18,7 +18,8 @@ public: \
   X(GetGlobalOp) X(EqOp) X(NeOp) X(LtOp) X(LeOp) X(NotOp) \
   X(EqFOp) X(NeFOp) X(LtFOp) X(LeFOp) X(NotFOp) X(SextOp) \
   X(YieldOp) X(I2FOp) X(F2IOp) X(UndefOp) X(ContinueOp) X(BreakOp) \
-  X(DoWhileOp) X(AddLOp) X(SubLOp) X(AddFOp) X(SubFOp) X(MulFOp) X(DivFOp) \
+  X(DoWhileOp) X(AddLOp) X(SubLOp) X(MulLOp) X(DivLOp) \
+  X(AddFOp) X(SubFOp) X(MulFOp) X(DivFOp) \
   X(LShiftOp) X(RShiftOp) X(MinOp) X(MaxOp) X(SelectOp) \
   /* ARM operations */ \
   X(AddWOp) X(AddXOp) X(MaddWOp) X(MsubWOp) \
@@ -58,7 +59,9 @@ public: \
   X(EorWIOp) X(LdrLslOp) X(StrLslOp) \
   X(LslWIOp) X(LsrWIOp) X(AsrWIOp) X(AsrXIOp) \
   X(SubWIOp) X(SubXIOp) X(AndWIOp) X(AndXIOp) \
-  X(CselLtIOp) X(CnegLtIOp)
+  X(CselLtIOp) X(CnegLtIOp) \
+  X(LdrPostIncrOp) X(LdrPreIncrOp) \
+  X(StrPostIncrOp) X(StrPreIncrOp) \
 
 #define arm_mem_op_list(X) \
   X(LdrOp) X(StrOp) X(LdpOp) X(StpOp)
@@ -84,7 +87,8 @@ public: \
   X(StoreOp) X(FuncOp) X(ArrayStoreOp) X(GlobalOp) X(ReturnOp) X(ModuleOp) \
   /* ARM operations */ \
   arm_branch_op_list(X) \
-  X(StrOp) X(StpOp) X(BOp) X(BlOp) X(RetOp)
+  X(StrOp) X(StpOp) X(BOp) X(BlOp) X(RetOp) \
+  X(StrPreIncrOp) X(StrPostIncrOp)
 
 #define targetful_op(Ty, ...) \
   op(Ty, \

@@ -249,4 +249,13 @@ void Pass::checkAssignmentLegality(Op *parent) const {
   });
 }
 
+void Pass::moveChainBefore(Op *op, Op *anchor, Op *loop) const {
+  if (!op->inside(loop))
+    return;
+
+  op->moveBefore(anchor);
+  for (auto x : op->getOperands())
+    moveChainBefore(x->def, op, loop);
+}
+
 }

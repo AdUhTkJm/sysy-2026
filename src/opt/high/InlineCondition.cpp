@@ -2,6 +2,8 @@
 
 namespace opt {
 
+int asmSize(const Type *ty);
+
 declare_pass(InlineCondition,
   void runImpl(DoWhileOp *loop) const;
 ) {
@@ -9,14 +11,13 @@ declare_pass(InlineCondition,
     runImpl(op);
 }
 
-
 // Remove the loop variable that is only used for loop condition,
 // and substitute it with another one.
 void InlineCondition::runImpl(DoWhileOp *loop) const {
   auto last = condition_of(loop);
   auto cond = last->val(0)->def;
 
-  if (!isa<LtOp>(cond) && !isa<AddIOp>(cond->val(0)->def))
+  if (!isa<LtOp>(cond) || !isa<AddIOp>(cond->val(0)->def))
     return;
 
   Value *lim;
@@ -27,20 +28,30 @@ void InlineCondition::runImpl(DoWhileOp *loop) const {
     return;
 
   auto incr = increment(indvar);
+  if (!incr)
+    return;
 
   // We must also attempt to find another value that increases by a constant.
   Value *candidate = nullptr, *inc, *cstart;
   auto variants = getVariantsIn(loop);
+  if (variants.count(lim))
+    return;
+  moveChainBefore(lim->def, loop, loop);
+
   for (unsigned i = 0; i < loop->getNumOperands(); i++) {
+    // Don't change into the eliminated variable again.
+    if (loop->ret(i) == indvar)
+      continue;
+
     auto next = last->val(i + 1)->def;
-    if (!isa<AddIOp>(next) || next->val(0) != loop->ret(i))
+    if ((!isa<AddIOp>(next) && !isa<AddLOp>(next)) || next->val(0) != loop->ret(i))
       continue;
 
     inc = next->val(1);
     if (variants.count(inc))
       continue;
 
-    inc->def->moveBefore(loop);
+    moveChainBefore(inc->def, loop, loop);
     candidate = loop->ret(i);
     cstart = loop->val(i);
     break;
@@ -65,13 +76,15 @@ void InlineCondition::runImpl(DoWhileOp *loop) const {
   // Now we synthesize the new limit:
   //    cstart + iterations * inc
   auto type = i32;
-  if (inc->type == i64) {
+  if (asmSize(inc->type) == 8) {
     iterations = builder.create<CastOp>(i64)->with(iterations->ret());
     type = i64;
   }
   
-  Op *mul = builder.create<MulIOp>(type)->with(iterations->ret(), inc);
-  if (cstart->type == i64 && type != i64) {
+  Op *mul = type == i32
+    ? (Op*) builder.create<MulIOp>(type)->with(iterations->ret(), inc)
+    : (Op*) builder.create<MulLOp>(type)->with(iterations->ret(), inc);
+  if (asmSize(cstart->type) == 8 && type != i64) {
     mul = builder.create<CastOp>(i64)->with(mul->ret());
     type = i64;
   }

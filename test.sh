@@ -85,8 +85,8 @@ while [[ $# -gt 0 ]] do
   -a|--print-all)
     printall=1
     shift;;
-  --nr|--no-range|--no-ranges)
-    norange=1;
+  --ranges)
+    ranges=1;
     shift;;
   -d|--directory)
     if [[ $# -lt 2 ]]; then
@@ -199,8 +199,8 @@ if [[ -n $testcase ]]; then
   if [[ -n $interpret ]]; then
     cmd="$cmd --interpret"
   fi
-  if [[ -n $norange ]]; then
-    cmd="$cmd --no-range"
+  if [[ -n $ranges ]]; then
+    cmd="$cmd --ranges"
   fi
   infile=${name/.sy/.in}
   if [[ -f $infile && ! -n $gdb ]]; then

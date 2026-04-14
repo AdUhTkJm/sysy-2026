@@ -12,7 +12,6 @@ declare_pass(SCEV,
 
   Value *generate(Value *ind, const Expr &delta);
   Value *generateStart(Value *target, Op *anchor);
-  void moveChainBefore(Op *op, Op *anchor);
 
   Builder builder;
   std::set<DoWhileOp*> visited;
@@ -95,20 +94,11 @@ Value *SCEV::generate(Value *ind, const Expr &delta) {
   return sym.at(delta.impl);
 }
 
-void SCEV::moveChainBefore(Op *op, Op *anchor) {
-  if (!op->inside(loop))
-    return;
-
-  op->moveBefore(anchor);
-  for (auto x : op->getOperands())
-    moveChainBefore(x->def, op);
-}
-
 Value *SCEV::generateStart(Value *target, Op *anchor) {
   if (auto it = starts.find(target); it != starts.end())
     return it->second;
   if (!variants.count(target)) {
-    moveChainBefore(target->def, anchor);
+    moveChainBefore(target->def, anchor, loop);
     return target;
   }
 

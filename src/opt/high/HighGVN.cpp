@@ -5,9 +5,13 @@
 namespace opt {
 
 #define allowed_list(X) \
-  X(IntOp) X(FloatOp) X(GetGlobalOp) X(SextOp) \
+  X(IntOp) X(FloatOp) X(GetGlobalOp) \
   X(AddIOp) X(SubIOp) X(MulIOp) X(DivIOp) X(ModIOp) \
-  X(AddLOp) X(LtOp) X(LeOp) X(EqOp) X(NeOp) \
+  X(AddLOp) X(SubLOp) X(MulLOp) X(DivLOp) \
+  X(AddFOp) X(SubFOp) X(MulFOp) X(DivFOp) \
+  X(LtOp) X(LeOp) X(EqOp) X(NeOp) \
+  X(LShiftOp) X(RShiftOp) X(MinOp) X(MaxOp) X(SelectOp) \
+  X(EqFOp) X(NeFOp) X(LtFOp) X(LeFOp) X(NotFOp) X(SextOp)
 
 #define allow(Ty) \
   isa<Ty>(op) ||

@@ -14,10 +14,14 @@ Pass *makeHighDCE(ir::ModuleOp *module);
 static Rule rules[] = {
   Rule("(addw (movi 'a) (movi 'b))") >> "(movi:i32 (!add 'a 'b))",
   Rule("(addw x (movi 'a))") >> "(addwi:i32 x 'a)" when { return imm("'a") < 4096 && imm("'a") >= 0; },
+
+  Rule("(addx x (movi 'a))") >> "(addxi:i64 x 'a)" when { return imm("'a") < 4096 && imm("'a") >= 0; },
   Rule("(addx x (movl 'a))") >> "(addxi:i64 x 'a)" when { return imm("'a") < 4096 && imm("'a") >= 0; },
 
   Rule("(subw (movi 'a) (movi 'b))") >> "(movi:i32 (!sub 'a 'b))",
   Rule("(subw x (movi 'a))") >> "(subwi:i32 x 'a)" when { return imm("'a") < 4096 && imm("'a") >= 0; },
+
+  Rule("(subx x (movi 'a))") >> "(subxi:i64 x 'a)" when { return imm("'a") < 4096 && imm("'a") >= 0; },
   Rule("(subx x (movl 'a))") >> "(subxi:i64 x 'a)" when { return imm("'a") < 4096 && imm("'a") >= 0; },
 
   Rule("(mulw x (movi 'a))") >> "x" when { return imm("'a") == 1; },
@@ -165,6 +169,18 @@ bool InstCombine::rewrite(Op *op) const {
     if (auto lsl = dyn_cast<LslWIOp>(lhs->def); lsl && lsl->value <= 4) {
       auto addw = builder.replace<AddSxtOp>(op, i64)->with(rhs, lsl->val());
       addw->value = lsl->value;
+      return true;
+    }
+    return false;
+  }
+
+  if (auto str = dyn_cast<StrOp>(op)) {
+    Builder builder;
+    auto base = op->val(0), val = op->val(1);
+    int imm = str->value;
+    if (auto add = dyn_cast<AddXIOp>(base->def); add) {
+      auto s = builder.replace<StrOp>(op)->with(add->val(), val);
+      s->value = imm + add->value;
       return true;
     }
     return false;

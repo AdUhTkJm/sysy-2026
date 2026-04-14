@@ -125,6 +125,8 @@ protected:
   // Finds the loop variable tested in the loop condition, along with its limit.
   ir::Value *indvar(ir::DoWhileOp *loop, ir::Value **limit = nullptr) const;
 
+  void moveChainBefore(ir::Op *op, ir::Op *anchor, ir::Op *loop) const;
+
   void checkAssignmentLegality(ir::Op *parent) const;
 public:
   virtual void run() = 0;

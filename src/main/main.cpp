@@ -46,11 +46,13 @@ void populate(opt::PassManager &pm) {
     add_pass(Fold);
   }
   add_pass(HighDCE);
+  add_pass(InlineCondition);
   add_pass(Range);
   add_pass(RangedFold);
   add_pass(LICM);
   add_pass(HighGVN);
-  add_pass(HighDCE);
+  // add_pass(AccessMode); // Erratic now.
+  add_pass(ADCE);
 
   // Mid-IR passes.
   add_pass(Flatten);

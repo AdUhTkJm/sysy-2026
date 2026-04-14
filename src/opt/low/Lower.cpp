@@ -33,7 +33,9 @@ void Lower::runImpl(FuncOp *func) {
   rename(SubIOp, SubWOp);
   rename(SubLOp, SubXOp);
   rename(MulIOp, MulWOp);
+  rename(MulLOp, MulXOp);
   rename(DivIOp, DivWOp);
+  rename(DivLOp, DivXOp);
   rename(AddFOp, FaddOp);
   rename(SubFOp, FsubOp);
   rename(MulFOp, FmulOp);
