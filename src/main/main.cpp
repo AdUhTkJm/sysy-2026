@@ -35,6 +35,8 @@ void populate(opt::PassManager &pm) {
   add_pass(LICM);
   add_pass(Fold);
   add_pass(Range);
+  add_pass(DLE);
+  add_pass(DSE);
   add_pass(LowerArray);
   add_pass(LICM);
   add_pass(HighGVN);

@@ -8,7 +8,7 @@ namespace opt {
   X(RaiseArray) X(Recursive) X(TidyCodeGen) X(Fold) X(HighGVN) \
   X(InlineGlobalStore) X(LICM) X(LowerArray) X(SCEV) X(ADCE) X(Inline) \
   X(FoldConstGlobal) X(Range) X(RangedFold) X(TCO) X(Unswitch) \
-  X(InlineCondition) X(AccessMode)
+  X(InlineCondition) X(AccessMode) X(DLE) X(DSE) \
 
 high_pass_list(make_pass_decl);
 #undef make_pass_decl

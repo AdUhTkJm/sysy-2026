@@ -540,7 +540,7 @@ printer(Int64Op) {
 }
 
 printer(FloatOp) {
-  os << printer->str(op->ret(0)) << " = " << cast<FloatOp>(op)->value;
+  os << printer->str(op->ret(0)) << " = " << cast<FloatOp>(op)->value << "f";
 }
 
 printer(JumpOp) {
@@ -619,12 +619,14 @@ printer(ReadRegOp) {
 
 printer(CastOp) {
   auto retreg = printer->str(op->ret()), fromreg = printer->str(op->val());
-  auto r = retreg; r[0] = 'x';
-  auto f = fromreg; f[0] = 'x';
-  if (!printer->showHidden) {
-    if (r == f)
-      return;
-  }
+  auto r = retreg;
+  if (r[0] != '%')
+    r[0] = 'x';
+  auto f = fromreg;
+  if (f[0] != '%')
+    f[0] = 'x';
+  if (!printer->showHidden && r == f)
+    return;
   os << "mov " << r << ", " << f;
 }
 
@@ -698,6 +700,14 @@ attr_printer(IncomingStackArgAttr) {
 
 attr_printer(UnreachableAttr) {
   os << "<unreachable: " << cast<UnreachableAttr>(attr)->region << ">";
+}
+
+attr_printer(SubscriptAttr) {
+  os << "<subscript: ";
+  auto subs = dyn_cast<SubscriptAttr>(attr);
+  for (const auto &sub : subs->subscripts)
+    os << sub << " ";
+  os << ">";
 }
 
 #define op_map_entry(Ty) { Ty::id, print##Ty },

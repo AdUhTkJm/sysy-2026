@@ -4,6 +4,7 @@
 #include "../utils/Meta.h"
 #include "../utils/DataStructure.h"
 #include "../utils/Alloc.h"
+#include "../utils/presburger/AffineFunction.h"
 #include <numeric>
 #include <map>
 
@@ -12,7 +13,8 @@ namespace ir {
 #define attr_list(X) \
   X(IntAttr) X(SizeAttr) X(DimAttr) X(ArgDimAttr) \
   X(ConstIArrAttr) X(ConstFArrAttr) X(UnerasableAttr) X(RecursiveAttr) \
-  X(IncomingStackArgAttr) X(NonIdempotentAttr) X(UnreachableAttr) X(StackOffsetAttr)
+  X(IncomingStackArgAttr) X(NonIdempotentAttr) X(UnreachableAttr) X(StackOffsetAttr) \
+  X(SubscriptAttr)
 
 class Block;
 class Value;
@@ -127,6 +129,13 @@ class UnreachableAttr : public AttrImpl<UnreachableAttr> {
 public:
   int region;
   UnreachableAttr(int i): region(i) {}
+};
+
+class SubscriptAttr : public AttrImpl<SubscriptAttr> {
+public:
+  std::vector<pres::AffineFunction> subscripts;
+  SubscriptAttr(const std::vector<pres::AffineFunction> &subscripts):
+    subscripts(subscripts) {}
 };
 
 using Attributes = std::vector<const Attr*>;

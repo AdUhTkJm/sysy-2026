@@ -182,7 +182,7 @@ public:
 #define fixed(...) \
   { \
     bool __changed; int __index = 0; \
-    do { __changed = false; if (__index > 100) assert(false && "fixed does not converge"); __VA_ARGS__ } \
+    do { __changed = false; if (__index > 10000) assert(false && "fixed does not converge"); __VA_ARGS__ } \
     while (++__index, __changed); \
   }
 

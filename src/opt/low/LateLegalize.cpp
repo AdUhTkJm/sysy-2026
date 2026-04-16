@@ -151,6 +151,40 @@ void LateLegalize::prologue(FuncOp *func) {
       wr->reg = ints[i];
     }
   }
+  for (unsigned i = 0; i < floats.size(); i += 2) {
+    auto alloca = builder.create<AllocaOp>(Type::pointer(vi4))->ret();
+
+    auto rd = createAssignedRd(builder, floats[i], f32);
+
+    if (i + 1 < floats.size()) {
+      auto rd2 = createAssignedRd(builder, floats[i + 1], f32);
+      builder.create<StpOp>()->with(alloca, rd->ret(), rd2->ret());
+    } else {
+      builder.create<StrOp>()->with(alloca, rd->ret());
+    }
+
+    Builder::Guard guard(builder);
+    builder.setBefore(region->getLastOp());
+    
+    if (i + 1 < floats.size()) {
+      auto ldp = builder.create<LdpOp>(f32, f32)->with(alloca);
+      
+      assignment[ldp->ret(0)] = floats[i];
+      assignment[ldp->ret(1)] = floats[i + 1];
+
+      auto wr1 = builder.create<WriteRegOp>()->with(ldp->ret(0));
+      wr1->reg = floats[i];
+
+      auto wr2 = builder.create<WriteRegOp>()->with(ldp->ret(1));
+      wr2->reg = floats[i + 1];
+    } else {
+      auto ldr = builder.create<LdrOp>(f32)->with(alloca);
+      assignment[ldr->ret()] = floats[i];
+
+      auto wr = builder.create<WriteRegOp>()->with(ldr->ret());
+      wr->reg = floats[i];
+    }
+  }
 }
 
 #define check_alloca \
