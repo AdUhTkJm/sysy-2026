@@ -2,6 +2,7 @@
 #include "../main/Options.h"
 #include "../ir/Printer.h"
 #include "../ir/Interpreter.h"
+#include <algorithm>
 
 using namespace ir;
 
@@ -256,6 +257,28 @@ void Pass::moveChainBefore(Op *op, Op *anchor, Op *loop) const {
   op->moveBefore(anchor);
   for (auto x : op->getOperands())
     moveChainBefore(x->def, op, loop);
+}
+
+std::optional<std::vector<Pass::Indvar>> Pass::collectIndvarFrom(ir::Op *op) {
+  std::vector<Pass::Indvar> result;
+  for (Op *x = op; !isa<FuncOp>(x); x = x->getParentOp()) {
+    auto loop = dyn_cast<DoWhileOp>(x);
+    if (!loop)
+      continue;
+
+    Indvar rec;
+    if (!(rec.indvar = indvar(loop, &rec.limit)))
+      return std::nullopt;
+
+    auto incr = increment(rec.indvar);
+    if (!incr || !isa<IntOp>(incr->def) || cast<IntOp>(incr->def)->value != 1)
+      return std::nullopt;
+
+    result.push_back(rec);
+  }
+  // Reverse it so that the outermost loop appears first in the vector.
+  std::reverse(result.begin(), result.end());
+  return result;
 }
 
 }

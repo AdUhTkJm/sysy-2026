@@ -4,21 +4,18 @@
 
 namespace opt {
 
-declare_pass(DLE,
+declare_pass(Subscript,
   using Liveset = std::set<LoadOp*>;
 
   void markSubscript();
   std::optional<pres::AffineFunction> getFunction(Value *v);
 
-  struct Record {
-    Value *indvar, *limit;
-  };
-  std::vector<Record> outer;
+  std::vector<Indvar> outer;
 ) {
   markSubscript();
 }
 
-void DLE::markSubscript() {
+void Subscript::markSubscript() {
   std::vector<Op*> ops;
   auto loads = collectOps<ArrayLoadOp>();
   auto stores = collectOps<ArrayStoreOp>();
@@ -26,42 +23,23 @@ void DLE::markSubscript() {
   std::copy(stores.begin(), stores.end(), std::back_inserter(ops));
 
   for (auto op : ops) {
-    outer.clear();
-    bool exit = false;
-    for (Op *x = op; !isa<FuncOp>(x); x = x->getParentOp()) {
-      if (auto loop = dyn_cast<DoWhileOp>(x)) {
-        Record rec;
-        rec.indvar = indvar(loop, &rec.limit);
-        if (!rec.indvar) {
-          exit = true;
-          break;
-        }
-        auto incr = increment(rec.indvar);
-        if (!incr || !isa<IntOp>(incr->def) || cast<IntOp>(incr->def)->value != 1) {
-          exit = true;
-          break;
-        }
-
-        outer.push_back(rec);
-      }
-    }
-    if (exit)
+    auto indvars = collectIndvarFrom(op);
+    if (!indvars)
       continue;
-    // Permute it so that the outermost loop appears first in the vector.
-    std::reverse(outer.begin(), outer.end());
-    
-    std::vector<pres::AffineFunction> subscripts;
 
+    outer = *indvars;
+    std::vector<pres::AffineFunction> subscripts;
     auto subscriptCount = op->getNumOperands();
     if (isa<ArrayStoreOp>(op))
       subscriptCount--;
+
+    bool exit = false;
     for (unsigned i = 1; i < subscriptCount; i++) {
       auto affine = getFunction(op->val(i));
       if (!affine) {
         exit = true;
         break;
       }
-
       subscripts.push_back(*affine);
     }
     if (exit)
@@ -71,7 +49,7 @@ void DLE::markSubscript() {
   }
 }
 
-std::optional<pres::AffineFunction> DLE::getFunction(Value *v) {
+std::optional<pres::AffineFunction> Subscript::getFunction(Value *v) {
   for (unsigned i = 0; i < outer.size(); i++) {
     if (v == outer[i].indvar)
       return pres::domain(outer.size())[i];

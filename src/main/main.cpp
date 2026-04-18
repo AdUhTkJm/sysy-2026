@@ -1,14 +1,11 @@
 #include "Options.h"
-
 #include "../parse/Parser.h"
 #include "../parse/Sema.h"
-
 #include "../ir/CodeGen.h"
-
 #include "../opt/high/Passes.h"
 #include "../opt/mid/Passes.h"
 #include "../opt/low/Passes.h"
-
+#include "../test/UnitTest.h"
 #include <fstream>
 #include <sstream>
 #include <iostream>
@@ -35,7 +32,8 @@ void populate(opt::PassManager &pm) {
   add_pass(LICM);
   add_pass(Fold);
   add_pass(Range);
-  add_pass(DLE);
+  add_pass(Subscript);
+  // add_pass(LoadSubstitute);
   add_pass(DSE);
   add_pass(LowerArray);
   add_pass(LICM);
@@ -74,6 +72,11 @@ void populate(opt::PassManager &pm) {
 
 int main(int argc, char **argv) {
   options = parseArgs(argc, argv);
+
+  if (options.unitTest != "") {
+    test::runUnitTest(options.unitTest);
+    return 0;
+  }
 
   // Read input file.
   std::ifstream ifs(options.inputFile);

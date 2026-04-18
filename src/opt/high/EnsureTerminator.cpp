@@ -44,6 +44,7 @@ declare_pass(EnsureTerminator,
   void removeContinue(ContinueOp *op);
   void removeBreak(BreakOp *op);
   void removeRedundant(Op *op);
+  void prepareErase(Op *op);
 
   bool canonicalizeReturn(IfOp *op);
   bool canonicalizeReturn(DoWhileOp *op);
@@ -83,6 +84,12 @@ void EnsureTerminator::erase(Op *op) {
   op->erase();
 }
 
+void EnsureTerminator::prepareErase(Op *op) {
+  op->clearOperands();
+  for (auto region : op->getRegions())
+    region->prepareErase();
+}
+
 void EnsureTerminator::removeRedundant(Op *op) {
   for (auto r : op->getRegions()) {
     // At the very beginning, we should have only a single block.
@@ -95,11 +102,22 @@ void EnsureTerminator::removeRedundant(Op *op) {
         break;
     }
     assert(it != bb->end());
-    it++;
-    while (it != bb->end()) {
-      auto next = it; next++;
-      erase(*it);
-      it = next;
+    auto first = it; ++first;
+    auto last = bb->end();
+    if (isa<DoWhileOp>(op) && isTerminator(*it)) {
+      for (auto jt = first; jt != bb->end(); ++jt) {
+        if (isa<CondMarkerOp>(*jt)) {
+          last = jt;
+          break;
+        }
+      }
+    }
+    for (auto jt = first; jt != last; ++jt)
+      prepareErase(*jt);
+    while (first != last) {
+      auto next = first; next++;
+      erase(*first);
+      first = next;
     }
   }
 }
@@ -134,7 +152,6 @@ void EnsureTerminator::removeBreak(BreakOp *op) {
 
 void EnsureTerminator::removeContinue(ContinueOp *op) {
   auto parent = op->getParentOp();
-  auto grandpa = parent->getParentBlock();
 
   if (isa<IfOp>(parent)) {
     // Essentially, move everything after this `if`
@@ -151,7 +168,7 @@ void EnsureTerminator::removeContinue(ContinueOp *op) {
     if (isa<ContinueOp>(last) || isa<ReturnOp>(last) || isa<BreakOp>(last)) {
       for (auto x = parent->nextOp(); x && !isa<CondMarkerOp>(x) && !isTerminator(x);) {
         auto next = x->nextOp();
-        x->clearOperands();
+        prepareErase(x);
         x = next;
       }
       for (auto x = parent->nextOp(); x && !isa<CondMarkerOp>(x) && !isTerminator(x);) {
@@ -187,7 +204,7 @@ void EnsureTerminator::removeContinue(ContinueOp *op) {
     // Move the continue to the outer layer, and supply a YieldOp.
     builder.setBefore(op);
     builder.create<YieldOp>();
-    op->moveToEnd(grandpa);
+    op->moveAfter(parent);
     return;
   }
 
@@ -195,7 +212,7 @@ void EnsureTerminator::removeContinue(ContinueOp *op) {
   if (isa<DoWhileOp>(parent)) {
     for (Op *x = op; x && !isa<CondMarkerOp>(x);) {
       auto next = x->nextOp();
-      x->clearOperands();
+      prepareErase(x);
       x = next;
     }
     for (Op *x = op; x && !isa<CondMarkerOp>(x);) {
@@ -215,7 +232,7 @@ bool EnsureTerminator::canonicalizeReturn(IfOp *op) {
     // if that exists.
     for (Op *x = op->nextOp(); x && !isa<CondMarkerOp>(x);) {
       auto next = x->nextOp();
-      x->clearOperands();
+      prepareErase(x);
       x = next;
     }
     for (Op *x = op->nextOp(); x && !isa<CondMarkerOp>(x);) {

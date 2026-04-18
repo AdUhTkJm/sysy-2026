@@ -2,6 +2,7 @@
 #define PASS_H
 
 #include "../ir/Ops.h"
+#include <optional>
 
 namespace opt {
 
@@ -128,6 +129,11 @@ protected:
   void moveChainBefore(ir::Op *op, ir::Op *anchor, ir::Op *loop) const;
 
   void checkAssignmentLegality(ir::Op *parent) const;
+
+  struct Indvar {
+    ir::Value *indvar, *limit;
+  };
+  std::optional<std::vector<Indvar>> collectIndvarFrom(ir::Op *op);
 public:
   virtual void run() = 0;
   virtual const char *name() = 0;

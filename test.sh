@@ -39,8 +39,14 @@ while [[ $# -gt 0 ]] do
     asm=$2
     shift 2;;
   -i|--interpret)
-    interpret=1
+    interpret=1 # NOTE: NOT COMPLETE! Don't use it.
     shift;;
+  -u|--unit-test)
+    if [[ $# -lt 2 ]]; then
+      die "expected unit test name"
+    fi
+    unittest=$2
+    shift 2;;
   -x|--execute)
     if [[ -z $output ]]; then
       output=temp/a.s
@@ -118,6 +124,11 @@ if [[ $ret -ne 0 ]]; then
   die "compile error: make returned $ret"
 fi
 cd ..
+
+if [[ -n $unittest ]]; then
+  ASAN_OPTIONS=detect_leaks=0 build/hcc --unit-test $unittest
+  exit $?
+fi
 
 if [[ -n $asm ]]; then
   aarch64-linux-gnu-gcc -x c test/lib.c -x assembler $asm -o temp/a.out -static

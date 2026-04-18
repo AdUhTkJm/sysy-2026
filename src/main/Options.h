@@ -30,6 +30,7 @@ struct Options {
   std::string printBefore;
   std::string compareWith;
   std::string interpretInput;
+  std::string unitTest;
   
   Options();
 } extern options;

@@ -54,6 +54,12 @@ Options parseArgs(int argc, char **argv) {
       continue;
     }
 
+    if (strcmp(argv[i], "--unit-test") == 0) {
+      opts.unitTest = argv[i + 1];
+      i++;
+      continue;
+    }
+
     PARSEOPT("--dump-ast", dumpAST);
     PARSEOPT("--dump-mid-ir", dumpMidIR);
     PARSEOPT("--rv", rv);

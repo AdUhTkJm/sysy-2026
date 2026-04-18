@@ -1,7 +1,8 @@
 last/
 build/
-test/
+/test/
 .cache/
+.codex
 temp/
 *.s
 *.txt
