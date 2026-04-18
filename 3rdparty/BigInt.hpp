@@ -741,16 +741,16 @@ inline void BigInt::swap(BigInt &lhs, BigInt &rhs) {
 }
 
 inline BigInt BigInt::gcd(const BigInt &lhs, const BigInt &rhs) {
-  BigInt temp_l = lhs, temp_r = rhs, remainder;
+  BigInt l = lhs, r = rhs, remainder;
   if (rhs > lhs)
-    swap(temp_l, temp_r);
+    swap(l, r);
 
-  while (temp_r > 0) {
-    remainder = temp_l % temp_r;
-    temp_l = temp_r;
-    temp_r = remainder;
+  while (r > 0) {
+    remainder = l % r;
+    l = r;
+    r = remainder;
   }
-  return temp_l;
+  return l;
 }
 
 inline BigInt BigInt::factorial(const BigInt &input) {

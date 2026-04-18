@@ -4,6 +4,7 @@
 #include "Matrix.h"
 #include <vector>
 #include <iosfwd>
+#include <optional>
 
 namespace pres {
 
@@ -24,60 +25,61 @@ struct Space {
 
 class PresburgerRelation;
 class IntegerRelation {
+public:
   Matrix eqs, ineqs;
   Space space;
-public:
+
   using Int = Matrix::value_type;
-  using Row = std::vector<Int>;
+  using Row = Matrix::Row;
 
   IntegerRelation(Space space, const Matrix &equalities, const Matrix &inequalities);
   IntegerRelation(Space space = {}, const std::vector<Row> &eqs = {}, const std::vector<Row> &ineqs = {});
+  IntegerRelation(Space space, const IntegerRelation::Row &point);
 
-  const Space &getSpace() const { return space; }
   unsigned getNumCols() const { return space.dimension() + 1; }
   unsigned getNumEqualities() const { return eqs.rowCount(); }
   unsigned getNumInequalities() const { return ineqs.rowCount(); }
+  unsigned dimension() const { return space.dimension(); }
 
-  const Matrix &equalities() const { return eqs; }
-  Matrix &equalities() { return eqs; }
-
-  const Matrix &inequalities() const { return ineqs; }
-  Matrix &inequalities() { return ineqs; }
-
-  void addEquality(const std::vector<Int> &row);
-  void addInequality(const std::vector<Int> &row);
+  void addEquality(const Row &row) { eqs.appendRow(row); }
+  void addInequality(const Row &row) { ineqs.appendRow(row); }
 
   bool isUniverse() const { return eqs.rowCount() == 0 && ineqs.rowCount() == 0; }
   bool isObviouslyEmpty() const;
   bool isEmpty() const;
+  bool containsPoint(const IntegerRelation::Row &point) const { return !intersect(IntegerRelation(space, point)).isEmpty(); }
 
-  void normalize();
-  void dump(std::ostream &os) const;
+  std::optional<Row> findSamplePoint() const;
+  Fraction getRationalMin(const Row &row) const;
+
+  void simplify();
+  void gcdTightenInequalities();
+  void normalize(); // Divide each row by gcd.
+  void dump(std::ostream &os = std::cerr) const;
 
   static IntegerRelation intersection(const IntegerRelation &lhs, const IntegerRelation &rhs);
   static PresburgerRelation setUnion(const IntegerRelation &lhs, const IntegerRelation &rhs);
   static PresburgerRelation setDifference(const IntegerRelation &lhs, const IntegerRelation &rhs);
 
   IntegerRelation intersect(const IntegerRelation &other) const { return intersection(*this, other); }
-  bool empty() const { return isEmpty(); }
-  PresburgerRelation subtract(const IntegerRelation &other) const;
 };
 
 class PresburgerRelation {
-  std::vector<IntegerRelation> disjuncts;
 public:
+  std::vector<IntegerRelation> disjuncts;
+  using Row = IntegerRelation::Row;
+
   PresburgerRelation() = default;
   PresburgerRelation(const IntegerRelation &disjunct): disjuncts({ disjunct }) {}
   PresburgerRelation(const std::vector<IntegerRelation> &disjuncts): disjuncts(disjuncts) {}
   PresburgerRelation(std::vector<IntegerRelation> &&disjuncts): disjuncts(std::move(disjuncts)) {}
 
-  const std::vector<IntegerRelation> &getDisjuncts() const { return disjuncts; }
-  std::vector<IntegerRelation> &getDisjuncts() { return disjuncts; }
-
   bool isEmpty() const;
-  bool empty() const { return isEmpty(); }
-  void normalize();
+  bool containsPoint(const Row &row) const;
+  void simplify();
   void dump(std::ostream &os) const;
+
+  unsigned getNumDisjuncts() const { return disjuncts.size(); }
 
   static PresburgerRelation intersection(const PresburgerRelation &lhs, const PresburgerRelation &rhs);
   static PresburgerRelation setUnion(const PresburgerRelation &lhs, const PresburgerRelation &rhs);

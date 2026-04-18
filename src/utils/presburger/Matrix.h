@@ -1,8 +1,13 @@
 #ifndef MATRIX_H
 #define MATRIX_H
 
-#include <cstring>
+#include <algorithm>
 #include <cassert>
+#include <cstring>
+#include <iomanip>
+#include <iostream>
+#include <sstream>
+#include <vector>
 #include "Fraction.h"
 
 namespace pres {
@@ -13,6 +18,7 @@ class MatrixBase {
   Int *data;
 public:
   using value_type = Int;
+  using Row = std::vector<Int>;
 
   MatrixBase(unsigned r = 0, unsigned c = 0): rows(r), cols(c), data(new Int[r * c]()) {}
   ~MatrixBase() { delete[] data; }
@@ -47,6 +53,9 @@ public:
     return data[r * cols + c];
   }
 
+  Int &at(unsigned r, unsigned c) { return (*this)(r, c); }
+  Int at(unsigned r, unsigned c) const { return (*this)(r, c); }
+
   unsigned rowCount() const { return rows; }
   unsigned colCount() const { return cols; }
   unsigned size() const { return rows * cols; }
@@ -69,18 +78,24 @@ public:
 
   void appendRow() { resize(rows + 1, cols); }
   void appendCol() { resize(rows, cols + 1); }
+  void appendRow(const Row &r) {
+    assert(r.size() == cols);
+    appendRow();
+    for (unsigned i = 0; i < cols; i++)
+      at(rows - 1, i) = r[i];
+  }
 
   void removeRow(unsigned r) {
     assert(r < rows);
 
     Int *d = new Int[(rows - 1) * cols];
 
-    size_t newr = 0;
-    for (size_t i = 0; i < rows; ++i) {
+    unsigned newr = 0;
+    for (unsigned i = 0; i < rows; ++i) {
       if (i == r)
         continue;
 
-      for (size_t c = 0; c < cols; c++)
+      for (unsigned c = 0; c < cols; c++)
         d[newr * cols + c] = data[i * cols + c];
       
       ++newr;
@@ -91,14 +106,14 @@ public:
     --rows;
   }
 
-  void removeCol(size_t c) {
+  void removeCol(unsigned c) {
     assert(c < cols);
 
     Int *d = new Int[rows * (cols - 1)];
 
-    for (size_t r = 0; r < rows; ++r) {
-      size_t new_c = 0;
-      for (size_t i = 0; i < cols; ++i) {
+    for (unsigned r = 0; r < rows; ++r) {
+      unsigned new_c = 0;
+      for (unsigned i = 0; i < cols; ++i) {
         if (i == c)
           continue;
 
@@ -112,17 +127,17 @@ public:
     --cols;
   }
 
-  void insertRow(size_t r) {
+  void insertRow(unsigned r) {
     assert(r < rows);
 
     Int *d = new Int[(rows + 1) * cols]();
 
-    for (size_t i = 0; i < rows + 1; ++i) {
+    for (unsigned i = 0; i < rows + 1; ++i) {
       if (i == r) 
         continue;
 
-      size_t src = (i < r) ? i : i - 1;
-      for (size_t c = 0; c < cols; ++c)
+      unsigned src = (i < r) ? i : i - 1;
+      for (unsigned c = 0; c < cols; ++c)
         d[i * cols + c] = data[src * cols + c];
     }
 
@@ -131,17 +146,17 @@ public:
     ++rows;
   }
 
-  void insertCol(size_t c) {
+  void insertCol(unsigned c) {
     assert(c < cols);
 
     Int* d = new Int[rows * (cols + 1)]();
 
-    for (size_t r = 0; r < rows; ++r) {
-      for (size_t i = 0; i < cols + 1; ++i) {
+    for (unsigned r = 0; r < rows; ++r) {
+      for (unsigned i = 0; i < cols + 1; ++i) {
         if (i == c)
           continue;
 
-        size_t src = (i < c) ? i : i - 1;
+        unsigned src = (i < c) ? i : i - 1;
         d[r * (cols + 1) + i] = data[r * cols + src];
       }
     }
@@ -149,6 +164,63 @@ public:
     delete[] data;
     data = d;
     ++cols;
+  }
+
+  Row row(unsigned r) const {
+    Row row;
+    row.reserve(cols);
+    for (unsigned i = 0; i < cols; i++)
+      row.push_back(at(i, r));
+    return row;
+  }
+
+  Int normalizeRow(unsigned r, unsigned limit = -1u) {
+    Int gcd = at(r, 0);
+    for (unsigned i = 1; i < std::min(limit, cols); i++)
+      gcd = pres::gcd(gcd, at(r, i));
+    if (gcd == 0)
+      return 0;
+    
+    for (unsigned i = 0; i < std::min(limit, cols); i++)
+      at(r, i) /= gcd;
+    return gcd;
+  }
+
+  void dump(std::ostream &os = std::cerr, int indent = 2) const {
+    size_t maxWidth = 6;
+    std::vector<std::string> elements(rows * cols);
+    for (unsigned r = 0; r < rows; ++r) {
+      for (unsigned c = 0; c < cols; ++c) {
+        std::ostringstream ss;
+        ss << at(r, c);
+        std::string str = ss.str();
+        elements[r * cols + c] = str;
+
+        bool negative = !str.empty() && str[0] == '-';
+        size_t valueWidth = negative ? str.size() - 1 : str.size();
+        maxWidth = std::max(maxWidth, valueWidth);
+      }
+    }
+
+    std::ios::fmtflags flags = os.flags();
+    char fill = os.fill();
+
+    for (unsigned r = 0; r < rows; ++r) {
+      if (indent > 0)
+        os << std::string(indent, ' ');
+      for (unsigned c = 0; c < cols; ++c) {
+        const std::string &str = elements[r * cols + c];
+        bool negative = !str.empty() && str[0] == '-';
+        const std::string number = negative ? str.substr(1) : str;
+
+        os << (negative ? '-' : ' ');
+        os << std::left << std::setw(maxWidth) << std::setfill(' ') << number;
+      }
+      os << '\n';
+    }
+
+    os.flags(flags);
+    os.fill(fill);
   }
 };
 

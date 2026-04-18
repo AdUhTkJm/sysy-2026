@@ -11,31 +11,6 @@ namespace {
 using Int = IntegerRelation::Int;
 using Row = IntegerRelation::Row;
 
-IntegerRelation pointRelation(Space space, const Row &point) {
-  IntegerRelation rel(space);
-  for (unsigned i = 0; i < point.size(); ++i) {
-    Row row(space.dimension() + 1, 0);
-    row[i] = 1;
-    row.back() = -point[i];
-    rel.addEquality(row);
-  }
-  rel.normalize();
-  return rel;
-}
-
-bool containsPoint(const IntegerRelation &rel, const Row &point) {
-  return !IntegerRelation::intersection(rel, pointRelation(rel.getSpace(), point)).isEmpty();
-}
-
-bool relationEmptyAtAllDisjuncts(const PresburgerRelation &rel,
-                                 const Row &point) {
-  for (const auto &disjunct : rel.getDisjuncts()) {
-    if (containsPoint(disjunct, point))
-      return false;
-  }
-  return true;
-}
-
 struct TestContext {
   int failures = 0;
 
@@ -82,27 +57,27 @@ void testIntegerRelationOps() {
   auto ge1 = IntegerRelation(s, {}, { { 1, -1 } });
 
   auto inter = IntegerRelation::intersection(ge0, le2);
-  expect(containsPoint(inter, { 0 }), "intersection should contain 0");
-  expect(containsPoint(inter, { 2 }), "intersection should contain 2");
-  expect(!containsPoint(inter, { 3 }), "intersection should not contain 3");
+  expect(inter.containsPoint({ 0 }), "intersection should contain 0");
+  expect(inter.containsPoint({ 2 }), "intersection should contain 2");
+  expect(!inter.containsPoint({ 3 }), "intersection should not contain 3");
 
   auto uni = IntegerRelation::setUnion(inter, ge1);
-  expect(uni.getDisjuncts().size() == 2,
+  expect(uni.getNumDisjuncts() == 2,
            "union of distinct basic relations should have two disjuncts");
-  expect(!relationEmptyAtAllDisjuncts(uni, { 0 }), "union should contain 0");
-  expect(!relationEmptyAtAllDisjuncts(uni, { 3 }), "union should contain 3");
+  expect(!uni.containsPoint({ 0 }), "union should contain 0");
+  expect(!uni.containsPoint({ 3 }), "union should contain 3");
 
   auto sameUnion = IntegerRelation::setUnion(inter, inter);
-  expect(sameUnion.getDisjuncts().size() == 1,
+  expect(sameUnion.getNumDisjuncts() == 1,
            "union of identical relations should collapse to one disjunct");
 
   auto singlePoint = IntegerRelation(s, { { 1, -1 } }, {});
   auto diff = IntegerRelation::setDifference(inter, singlePoint);
-  expect(relationEmptyAtAllDisjuncts(diff, { 1 }),
+  expect(diff.containsPoint({ 1 }),
            "difference should remove x == 1");
-  expect(!relationEmptyAtAllDisjuncts(diff, { 0 }),
+  expect(!diff.containsPoint({ 0 }),
            "difference should keep 0");
-  expect(!relationEmptyAtAllDisjuncts(diff, { 2 }),
+  expect(!diff.containsPoint({ 2 }),
            "difference should keep 2");
 }
 
@@ -115,26 +90,49 @@ void testPresburgerRelationOps() {
 
   PresburgerRelation disj({ x0, x2 });
   auto inter = PresburgerRelation::intersection(disj, PresburgerRelation(ge1));
-  expect(inter.getDisjuncts().size() == 1,
+  expect(inter.getNumDisjuncts() == 1,
            "intersection should keep only the surviving disjunct");
-  expect(!relationEmptyAtAllDisjuncts(inter, { 2 }),
+  expect(!inter.containsPoint({ 2 }),
            "intersected disjunction should contain 2");
-  expect(relationEmptyAtAllDisjuncts(inter, { 0 }),
+  expect(inter.containsPoint({ 0 }),
            "intersected disjunction should not contain 0");
 
   auto uni = PresburgerRelation::setUnion(PresburgerRelation(x0), PresburgerRelation(x2));
-  expect(uni.getDisjuncts().size() == 2,
+  expect(uni.getNumDisjuncts() == 2,
            "Presburger union should keep both singleton disjuncts");
 
   auto diff = PresburgerRelation::setDifference(
       PresburgerRelation(IntegerRelation(s, {}, { { 1, 0 }, { -1, 2 } })),
       PresburgerRelation(x1));
-  expect(relationEmptyAtAllDisjuncts(diff, { 1 }),
+  expect(diff.containsPoint({ 1 }),
            "Presburger difference should remove 1");
-  expect(!relationEmptyAtAllDisjuncts(diff, { 0 }),
+  expect(!diff.containsPoint({ 0 }),
            "Presburger difference should keep 0");
-  expect(!relationEmptyAtAllDisjuncts(diff, { 2 }),
+  expect(!diff.containsPoint({ 2 }),
            "Presburger difference should keep 2");
+}
+
+void testSimplex() {
+  Space s { 3, 0, 0, 0 };
+  // x + 2y >= 3
+  // y + 2z == 4
+  // z + 2x >= 5
+  //
+  // x, y, z <= 10 to make it bounded
+  IntegerRelation rel(s, {
+    { 0, 1, 2, 4 }
+  }, {
+    { 1, 2, 0, 3 },
+    { 2, 0, 1, 4 },
+    { -1, 0, 0, 10 },
+    { 0, -1, 0, 10 },
+    { 0, 0, -1, 10 }
+  });
+  rel.dump();
+
+  // This means x + z >= 8/3.
+  expect(rel.getRationalMin({ 1, 0, 1, 0 }) == Fraction(8, 3),
+    "Simplex test failed");
 }
 
 } // namespace
@@ -143,6 +141,7 @@ namespace test {
 
 void runIntegerRelationTests() {
   const std::vector<std::pair<std::string, std::function<void()>>> tests = {
+    { "TestSimplex", testSimplex },
     { "IntegerEmptiness", testIntegerEmptiness },
     { "IntegerRelationOps", testIntegerRelationOps },
     { "PresburgerRelationOps", testPresburgerRelationOps },

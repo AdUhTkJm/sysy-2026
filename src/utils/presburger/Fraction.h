@@ -8,7 +8,7 @@ template<class Int>
 class FractionBase {
   Int nom, den;
 public:
-  void normalize() {
+  void simplify() {
     assert(den != 0);
 
     if (den < 0) {
@@ -29,9 +29,10 @@ public:
   }
 
   FractionBase(): nom(0), den(1) {}
+  FractionBase(int value): FractionBase(Int(value)) {}
   FractionBase(const Int &value): nom(value), den(1) {}
   FractionBase(const Int &numerator, const Int &denominator): nom(numerator), den(denominator) {
-    normalize();
+    simplify();
   }
 
   const Int &numerator() const { return nom; }
@@ -43,21 +44,21 @@ public:
   FractionBase &operator+=(const FractionBase &other) {
     nom = nom * other.den + other.nom * den;
     den *= other.den;
-    normalize();
+    simplify();
     return *this;
   }
 
   FractionBase &operator-=(const FractionBase &other) {
     nom = nom * other.den - other.nom * den;
     den *= other.den;
-    normalize();
+    simplify();
     return *this;
   }
 
   FractionBase &operator*=(const FractionBase &other) {
     nom *= other.nom;
     den *= other.den;
-    normalize();
+    simplify();
     return *this;
   }
 
@@ -65,7 +66,7 @@ public:
     assert(other.nom != 0);
     nom *= other.den;
     den *= other.nom;
-    normalize();
+    simplify();
     return *this;
   }
 
@@ -119,8 +120,12 @@ public:
       os << "/" << fraction.den;
     return os;
   }
-
 };
+
+template<class Int>
+FractionBase<Int> abs(const FractionBase<Int> &x) {
+  return x < 0 ? -x : x;
+}
 
 using Fraction = FractionBase<BigInt>;
 

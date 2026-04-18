@@ -126,7 +126,11 @@ fi
 cd ..
 
 if [[ -n $unittest ]]; then
-  ASAN_OPTIONS=detect_leaks=0 build/hcc --unit-test $unittest
+  cmd="build/hcc --unit-test $unittest"
+  if [[ -n $gdb ]]; then
+    cmd="gdb --args $cmd"
+  fi
+  eval "ASAN_OPTIONS=detect_leaks=0 $cmd"
   exit $?
 fi
 
