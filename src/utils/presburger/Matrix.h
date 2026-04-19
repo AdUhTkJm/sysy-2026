@@ -56,8 +56,8 @@ public:
   Int &at(unsigned r, unsigned c) { return (*this)(r, c); }
   Int at(unsigned r, unsigned c) const { return (*this)(r, c); }
 
-  unsigned rowCount() const { return rows; }
-  unsigned colCount() const { return cols; }
+  unsigned getNumRows() const { return rows; }
+  unsigned getNumCols() const { return cols; }
   unsigned size() const { return rows * cols; }
 
   void resize(unsigned nr, unsigned nc) {
@@ -170,12 +170,12 @@ public:
     Row row;
     row.reserve(cols);
     for (unsigned i = 0; i < cols; i++)
-      row.push_back(at(i, r));
+      row.push_back(at(r, i));
     return row;
   }
 
   Int normalizeRow(unsigned r, unsigned limit = -1u) {
-    Int gcd = at(r, 0);
+    Int gcd = abs(at(r, 0));
     for (unsigned i = 1; i < std::min(limit, cols); i++)
       gcd = pres::gcd(gcd, at(r, i));
     if (gcd == 0)

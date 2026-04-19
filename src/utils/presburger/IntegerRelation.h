@@ -23,6 +23,28 @@ struct Space {
   }
 };
 
+struct Constraint {
+  using Int = Matrix::value_type;
+  using Coeffs = std::unordered_map<unsigned, Int>;
+
+  Coeffs coeffs;
+  Int constant;
+  enum {
+    Incomplete, Eq, Ineq
+  } status;
+
+  Constraint flipped() const;
+  Constraint operator>=(Int c) const { return { coeffs, constant - c, Ineq }; }
+  Constraint operator>(Int c) const { return { coeffs, constant - c - 1, Ineq }; }
+  Constraint operator<=(Int c) const { auto w = flipped(); w.constant += c; w.status = Ineq; return w; }
+  Constraint operator<(Int c) const { auto w = flipped(); w.constant += c + 1; w.status = Ineq; return w; }
+  Constraint operator==(Int c) const { return { coeffs, constant - c, Eq }; }
+};
+
+struct Var {
+  Constraint operator[](unsigned i) const { return { { { i, 1 } }, 0, Constraint::Incomplete }; }
+} const extern var;
+
 class PresburgerRelation;
 class IntegerRelation {
 public:
@@ -37,20 +59,28 @@ public:
   IntegerRelation(Space space, const IntegerRelation::Row &point);
 
   unsigned getNumCols() const { return space.dimension() + 1; }
-  unsigned getNumEqualities() const { return eqs.rowCount(); }
-  unsigned getNumInequalities() const { return ineqs.rowCount(); }
+  unsigned getNumEqualities() const { return eqs.getNumRows(); }
+  unsigned getNumInequalities() const { return ineqs.getNumRows(); }
   unsigned dimension() const { return space.dimension(); }
 
   void addEquality(const Row &row) { eqs.appendRow(row); }
   void addInequality(const Row &row) { ineqs.appendRow(row); }
+  void add(const Constraint &constr);
 
-  bool isUniverse() const { return eqs.rowCount() == 0 && ineqs.rowCount() == 0; }
+  bool isUniverse() const { return eqs.getNumRows() == 0 && ineqs.getNumRows() == 0; }
   bool isObviouslyEmpty() const;
   bool isEmpty() const;
   bool containsPoint(const IntegerRelation::Row &point) const { return !intersect(IntegerRelation(space, point)).isEmpty(); }
 
   std::optional<Row> findSamplePoint() const;
-  Fraction getRationalMin(const Row &row) const;
+
+  struct Simplex {
+    FracMatrix tableau;
+    std::vector<unsigned> basis;
+    bool feasible;
+  };
+  Simplex simplex(const Row &target) const;
+  std::optional<Fraction> getRationalMin(const Row &target) const;
 
   void simplify();
   void gcdTightenInequalities();
@@ -96,6 +126,30 @@ inline PresburgerRelation operator+(const IntegerRelation &l, const IntegerRelat
 
 inline PresburgerRelation operator-(const IntegerRelation &l, const IntegerRelation &r) {
   return IntegerRelation::setDifference(l, r);
+}
+
+inline PresburgerRelation operator+(const PresburgerRelation &l, const PresburgerRelation &r) {
+  return PresburgerRelation::setUnion(l, r);
+}
+
+inline PresburgerRelation operator-(const PresburgerRelation &l, const PresburgerRelation &r) {
+  return PresburgerRelation::setDifference(l, r);
+}
+
+inline bool operator==(const IntegerRelation &l, const IntegerRelation &r) {
+  return (l - r).isEmpty() && (r - l).isEmpty();
+}
+
+inline bool operator!=(const IntegerRelation &l, const IntegerRelation &r) {
+  return !(l == r);
+}
+
+inline bool operator==(const PresburgerRelation &l, const PresburgerRelation &r) {
+  return (l - r).isEmpty() && (r - l).isEmpty();
+}
+
+inline bool operator!=(const PresburgerRelation &l, const PresburgerRelation &r) {
+  return !(l == r);
 }
 
 std::ostream &operator<<(std::ostream &os, const IntegerRelation &relation);

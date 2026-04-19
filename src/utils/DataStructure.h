@@ -5,6 +5,7 @@
 #include <utility>
 #include <iterator>
 #include <vector>
+#include <iostream>
 
 namespace data {
 

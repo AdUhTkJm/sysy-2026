@@ -741,7 +741,7 @@ inline void BigInt::swap(BigInt &lhs, BigInt &rhs) {
 }
 
 inline BigInt BigInt::gcd(const BigInt &lhs, const BigInt &rhs) {
-  BigInt l = lhs, r = rhs, remainder;
+  BigInt l = abs(lhs), r = abs(rhs), remainder;
   if (rhs > lhs)
     swap(l, r);
 

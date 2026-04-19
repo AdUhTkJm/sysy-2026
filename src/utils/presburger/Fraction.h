@@ -6,68 +6,72 @@ namespace pres {
 
 template<class Int>
 class FractionBase {
-  Int nom, den;
 public:
+  Int num, den;
   void simplify() {
     assert(den != 0);
 
     if (den < 0) {
-      nom = -nom;
+      num = -num;
       den = -den;
     }
 
-    if (nom == 0) {
+    if (num == 0) {
       den = 1;
       return;
     }
 
-    auto g = gcd(abs(nom), den);
+    auto g = gcd(abs(num), den);
     if (g != 1) {
-      nom /= g;
+      num /= g;
       den /= g;
     }
   }
 
-  FractionBase(): nom(0), den(1) {}
+  bool isInteger() const { return den == 1; }
+
+  FractionBase(): num(0), den(1) {}
   FractionBase(int value): FractionBase(Int(value)) {}
-  FractionBase(const Int &value): nom(value), den(1) {}
-  FractionBase(const Int &numerator, const Int &denominator): nom(numerator), den(denominator) {
+  FractionBase(const Int &value): num(value), den(1) {}
+  FractionBase(const Int &numerator, const Int &denominator): num(numerator), den(denominator) {
     simplify();
   }
 
-  const Int &numerator() const { return nom; }
-  const Int &denominator() const { return den; }
-
   FractionBase operator+() const { return *this; }
-  FractionBase operator-() const { return FractionBase(-nom, den); }
+  FractionBase operator-() const { return FractionBase(-num, den); }
 
   FractionBase &operator+=(const FractionBase &other) {
-    nom = nom * other.den + other.nom * den;
+    num = num * other.den + other.num * den;
     den *= other.den;
     simplify();
     return *this;
   }
 
   FractionBase &operator-=(const FractionBase &other) {
-    nom = nom * other.den - other.nom * den;
+    num = num * other.den - other.num * den;
     den *= other.den;
     simplify();
     return *this;
   }
 
   FractionBase &operator*=(const FractionBase &other) {
-    nom *= other.nom;
+    num *= other.num;
     den *= other.den;
     simplify();
     return *this;
   }
 
   FractionBase &operator/=(const FractionBase &other) {
-    assert(other.nom != 0);
-    nom *= other.den;
-    den *= other.nom;
+    assert(other.num != 0);
+    num *= other.den;
+    den *= other.num;
     simplify();
     return *this;
+  }
+
+  explicit operator Int() const {
+    assert(isInteger());
+    return num;
   }
 
   friend FractionBase operator+(FractionBase lhs, const FractionBase &rhs) {
@@ -91,7 +95,7 @@ public:
   }
 
   friend bool operator==(const FractionBase &lhs, const FractionBase &rhs) {
-    return lhs.nom == rhs.nom && lhs.den == rhs.den;
+    return lhs.num == rhs.num && lhs.den == rhs.den;
   }
 
   friend bool operator!=(const FractionBase &lhs, const FractionBase &rhs) {
@@ -99,7 +103,7 @@ public:
   }
 
   friend bool operator<(const FractionBase &lhs, const FractionBase &rhs) {
-    return lhs.nom * rhs.den < rhs.nom * lhs.den;
+    return lhs.num * rhs.den < rhs.num * lhs.den;
   }
 
   friend bool operator>(const FractionBase &lhs, const FractionBase &rhs) {
@@ -115,7 +119,7 @@ public:
   }
 
   friend std::ostream &operator<<(std::ostream &os, const FractionBase &fraction) {
-    os << fraction.nom;
+    os << fraction.num;
     if (fraction.den != 1)
       os << "/" << fraction.den;
     return os;

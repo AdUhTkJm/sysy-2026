@@ -25,10 +25,10 @@ struct TestContext {
 void expectFractionEq(const Fraction &actual, const Fraction &expected,
                       const std::string &message) {
   expect(actual == expected,
-         message + " (expected " + static_cast<std::string>(expected.numerator()) +
-             "/" + static_cast<std::string>(expected.denominator()) +
-             ", got " + static_cast<std::string>(actual.numerator()) +
-             "/" + static_cast<std::string>(actual.denominator()) + ")");
+         message + " (expected " + static_cast<std::string>(expected.num) +
+             "/" + static_cast<std::string>(expected.den) +
+             ", got " + static_cast<std::string>(actual.den) +
+             "/" + static_cast<std::string>(actual.den) + ")");
 }
 
 void testNormalization() {
