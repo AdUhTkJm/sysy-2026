@@ -20,6 +20,7 @@ static Rule rules[] = {
   Rule("(addi x x)") >> "(muli:i32 x (int:i32 2))",
   Rule("(addi (addi x (int 'a)) y)") >> "(addi:i32 (addi:i32 x y) (int:i32 'a))",
   Rule("(addi (subi (int 'a) x) y)") >> "(subi:i32 y x)" when zero,
+  Rule("(addi (subi x y) y)") >> "x",
 
   Rule("(addl x (int64 'a))") >> "x" when zero,
   Rule("(addl (int64 'a) (int64 'b))") >> "(int64:i64 (!add 'a 'b))",

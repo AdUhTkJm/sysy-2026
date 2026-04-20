@@ -274,6 +274,22 @@ Constraint Constraint::flipped() const {
   return { c, -constant, status };
 }
 
+Constraint Constraint::operator+(const Constraint &other) const {
+  assert(status == Incomplete && other.status == Incomplete);
+  Constraint result { coeffs, other.constant + constant, Incomplete };
+  for (const auto &[k, v] : other.coeffs)
+    result.coeffs[k] += v;
+  return result;
+}
+
+Constraint Constraint::operator-(const Constraint &other) const {
+  assert(status == Incomplete && other.status == Incomplete);
+  Constraint result { coeffs, constant - other.constant, Incomplete };
+  for (const auto &[k, v] : other.coeffs)
+    result.coeffs[k] -= v;
+  return result;
+}
+
 void IntegerRelation::add(const Constraint &c) {
   unsigned cols = dimension() + 1;
   Row row(cols);
@@ -567,6 +583,11 @@ PresburgerRelation PresburgerRelation::setUnion(const PresburgerRelation &lhs, c
   PresburgerRelation relation(std::move(result));
   relation.simplify();
   return relation;
+}
+
+PresburgerRelation &PresburgerRelation::operator+=(const PresburgerRelation &other) {
+  std::copy(other.disjuncts.begin(), other.disjuncts.end(), std::back_inserter(disjuncts));
+  return *this;
 }
 
 PresburgerRelation PresburgerRelation::setDifference(const PresburgerRelation &lhs, const PresburgerRelation &rhs) {

@@ -35,10 +35,14 @@ void populate(opt::PassManager &pm) {
   add_pass(Subscript);
   // add_pass(LoadSubstitute);
   add_pass(DSE);
+  add_pass(Unswitch);
+  add_pass(Unroll);
+  add_pass(Fold);
+  add_pass(HighGVN);
+  add_pass(RedundantLoad);
   add_pass(LowerArray);
   add_pass(LICM);
   add_pass(HighGVN);
-  add_pass(Unswitch);
   for (int i = 0; i < 3; i++) {
     add_pass(SCEV);
     add_pass(ADCE);

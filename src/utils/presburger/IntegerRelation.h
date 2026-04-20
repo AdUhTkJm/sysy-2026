@@ -39,6 +39,9 @@ struct Constraint {
   Constraint operator<=(Int c) const { auto w = flipped(); w.constant += c; w.status = Ineq; return w; }
   Constraint operator<(Int c) const { auto w = flipped(); w.constant += c + 1; w.status = Ineq; return w; }
   Constraint operator==(Int c) const { return { coeffs, constant - c, Eq }; }
+
+  Constraint operator+(const Constraint &other) const;
+  Constraint operator-(const Constraint &other) const;
 };
 
 struct Var {
@@ -118,6 +121,8 @@ public:
   PresburgerRelation intersect(const PresburgerRelation &other) const { return intersection(*this, other); }
   PresburgerRelation unite(const PresburgerRelation &other) const { return setUnion(*this, other); }
   PresburgerRelation subtract(const PresburgerRelation &other) const { return setDifference(*this, other); }
+
+  PresburgerRelation &operator+=(const PresburgerRelation &other);
 };
 
 inline PresburgerRelation operator+(const IntegerRelation &l, const IntegerRelation &r) {

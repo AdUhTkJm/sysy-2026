@@ -73,7 +73,7 @@ Options parseArgs(int argc, char **argv) {
     PARSEOPT("--print-all", printAll);
     PARSEOPT("--print-type", printType);
     PARSEOPT("--ranges", ranges);
-    PARSEOPT("--interpret", interpret);
+    PARSEOPT("--interpret", interpret); // NOTE: FEATURE NOT COMPLETE. Don't use it.
 
     if (opts.inputFile != "") {
       std::cerr << "error: multiple inputs\n";

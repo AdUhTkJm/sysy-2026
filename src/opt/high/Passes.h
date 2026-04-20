@@ -9,6 +9,8 @@ namespace opt {
   X(InlineGlobalStore) X(LICM) X(LowerArray) X(SCEV) X(ADCE) X(Inline) \
   X(FoldConstGlobal) X(Range) X(RangedFold) X(TCO) X(Unswitch) \
   X(InlineCondition) X(AccessMode) X(Subscript) X(DSE) X(LoadSubstitute) \
+  X(RedundantLoad) \
+  X(Unroll)
 
 high_pass_list(make_pass_decl);
 #undef make_pass_decl
